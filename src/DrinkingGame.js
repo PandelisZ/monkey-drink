@@ -3,13 +3,26 @@ import React, { useState } from 'react';
 function DrinkingGame() {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [spinning, setSpinning] = useState(false);
+  const [playerNames, setPlayerNames] = useState({
+    1: "Player 1",
+    2: "Player 2",
+    3: "Player 3",
+    4: "Player 4"
+  });
   
   const players = [
-    { id: 1, name: "Player 1", emoji: "🦍" },
-    { id: 2, name: "Player 2", emoji: "🦍" },
-    { id: 3, name: "Player 3", emoji: "🦍" },
-    { id: 4, name: "Player 4", emoji: "🦍" }
+    { id: 1, emoji: "🦍" },
+    { id: 2, emoji: "🦍" },
+    { id: 3, emoji: "🦍" },
+    { id: 4, emoji: "🦍" }
   ];
+
+  const handleNameChange = (id, newName) => {
+    setPlayerNames(prevNames => ({
+      ...prevNames,
+      [id]: newName
+    }));
+  };
 
   const randomizePlayer = () => {
     if (spinning) return;
@@ -43,7 +56,13 @@ function DrinkingGame() {
             }}
           >
             <div style={styles.emoji}>{player.emoji}</div>
-            <div>{player.name}</div>
+            <input
+              type="text"
+              value={playerNames[player.id]}
+              onChange={(e) => handleNameChange(player.id, e.target.value)}
+              style={styles.nameInput}
+              placeholder="Enter gorilla name"
+            />
             {selectedPlayer === player.id && (
               <div style={styles.drinkMessage}>DRINK! 🍺</div>
             )}
@@ -62,7 +81,7 @@ function DrinkingGame() {
       <div style={styles.instructions}>
         <p>How to play:</p>
         <ol>
-          <li>Gather 4 players in a circle</li>
+          <li>Gather 4 players and name your gorillas</li>
           <li>Press the "Spin" button</li>
           <li>The selected gorilla must drink!</li>
           <li>Repeat and enjoy responsibly 🍻</li>
@@ -110,6 +129,15 @@ const styles = {
   emoji: {
     fontSize: '50px',
     marginBottom: '10px'
+  },
+  nameInput: {
+    width: '90%',
+    padding: '8px',
+    margin: '5px 0',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    fontSize: '14px',
+    textAlign: 'center'
   },
   drinkMessage: {
     marginTop: '10px',
