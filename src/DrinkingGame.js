@@ -23,44 +23,64 @@ function DrinkingGame() {
 
   const questions = [
     { 
-      question: "Where did Sam and Emily have their first date?", 
-      answer: "Italian restaurant" 
+      question: "Which BBC sci-fi comedy featured a character named Arnold Judas Rimmer?", 
+      answer: "Red Dwarf" 
     },
     { 
-      question: "What is Emily's favorite color that Sam always forgets?", 
-      answer: "Purple" 
+      question: "In 'Blackadder Goes Forth', what was Lieutenant George's full name?", 
+      answer: "George Colthurst St. Barleigh" 
     },
     { 
-      question: "What's the name of Sam and Emily's pet?", 
-      answer: "Whiskers" 
+      question: "Which BBC show featured a time traveling police box called the TARDIS?", 
+      answer: "Doctor Who" 
     },
     { 
-      question: "What anniversary gift did Sam forget last year?", 
-      answer: "Flowers" 
+      question: "In the BBC series 'Blake's 7', what was the name of the sentient computer on board the Liberator?", 
+      answer: "Zen" 
     },
     { 
-      question: "What food does Emily hate that Sam keeps cooking?", 
-      answer: "Brussels sprouts" 
+      question: "Which 80s BBC comedy featured the characters of Vyvyan, Rick, Neil, and Mike living in a shared house?", 
+      answer: "The Young Ones" 
     },
     { 
-      question: "Where are Sam and Emily planning their next vacation?", 
-      answer: "Hawaii" 
+      question: "Who played the lead role of Jim Hacker in 'Yes Minister'?", 
+      answer: "Paul Eddington" 
     },
     { 
-      question: "What TV show do Sam and Emily always argue about?", 
-      answer: "Game of Thrones" 
+      question: "What was the name of the spaceship in the BBC series 'Blake's 7'?", 
+      answer: "Liberator" 
     },
     { 
-      question: "What embarrassing nickname does Emily call Sam?", 
-      answer: "Sammy Bear" 
+      question: "Which BBC comedy featured the Trotters living in Peckham?", 
+      answer: "Only Fools and Horses" 
     },
     { 
-      question: "What did Sam break of Emily's that he tried to hide?", 
-      answer: "Favorite mug" 
+      question: "In the BBC series 'Edge of Darkness', what was Bob Peck's character investigating?", 
+      answer: "His daughter's murder" 
     },
     { 
-      question: "How many times has Sam been late to date night in the past month?", 
-      answer: "Three" 
+      question: "Which BBC comedy series starred Penelope Keith as Audrey fforbes-Hamilton?", 
+      answer: "To the Manor Born" 
+    },
+    {
+      question: "What was the name of the pub in the BBC sitcom 'Allo 'Allo!?",
+      answer: "Café René"
+    },
+    {
+      question: "Which actor played the seventh Doctor in the classic Doctor Who series?",
+      answer: "Sylvester McCoy"
+    },
+    {
+      question: "In 'Blackadder II', what was Lord Blackadder's first name?",
+      answer: "Edmund"
+    },
+    {
+      question: "Which BBC comedy featured a decrepit seaside hotel run by Basil Fawlty?",
+      answer: "Fawlty Towers"
+    },
+    {
+      question: "What was the name of Del Boy's younger brother in 'Only Fools and Horses'?",
+      answer: "Rodney"
     }
   ];
 
@@ -200,7 +220,7 @@ function DrinkingGame() {
         <ol>
           <li>Gather 4 players and name your gorillas</li>
           <li>Press the "Spin" button</li>
-          <li>The selected gorilla must answer a personal question about Sam and Emily</li>
+          <li>The selected gorilla must answer a trivia question about obscure BBC TV shows from the 80s</li>
           <li>Answer correctly to be safe, or drink if you're wrong! 🍻</li>
         </ol>
       </div>
