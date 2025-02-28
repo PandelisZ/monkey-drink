@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import PlayerCard from './PlayerCard';
 
 function BoxingRing({ 
@@ -21,6 +21,12 @@ function BoxingRing({
 }) {
   // State to track which pairing is currently shown in the first round
   const [activePairingIndex, setActivePairingIndex] = useState(0);
+  const [localGameActive, setLocalGameActive] = useState(gameActive);
+  
+  // Update local state when props change
+  useEffect(() => {
+    setLocalGameActive(gameActive);
+  }, [gameActive]);
 
   // Helper function to get opponent for a player
   const getOpponent = (playerId) => {
@@ -31,7 +37,7 @@ function BoxingRing({
     return players.find(p => p.id === opponentId);
   };
 
-  // Check if player is in active match - modified to ensure only two gorillas at a time
+  // Check if player is in active match
   const isPlayerActive = (playerId) => {
     if (!pairings.length) return false;
     
@@ -40,7 +46,7 @@ function BoxingRing({
       return pairings[activePairingIndex].includes(playerId);
     }
     
-    // In final round, show the only remaining pairing
+    // In final round or when there's only one pairing, show all active pairings
     return pairings.some(pair => pair.includes(playerId));
   };
 
@@ -52,16 +58,26 @@ function BoxingRing({
   // Handle moving to the second semi-final
   const continueToSecondSemiFinal = () => {
     setActivePairingIndex(1);
-    // Reset the game state for the second pairing
-    gameActive = true;
-    gameEnded = false;
+    setLocalGameActive(true);
   };
 
-  // Initialize players with reduced health (50 instead of 100)
+  // Create players with reduced health
   const playersWithReducedHealth = players.map(player => ({
     ...player,
-    health: 50
+    health: player.health > 50 ? 50 : player.health // Ensure health doesn't exceed 50
   }));
+
+  // Determine if we're showing the "continue to second semi-final" button
+  const showContinueButton = currentRound === 1 && 
+                            roundWinners.length === 1 && 
+                            !localGameActive && 
+                            pairings.length > 1 && 
+                            activePairingIndex === 0;
+
+  // Determine if we're showing the "start championship final" button                          
+  const showFinalButton = currentRound === 1 && 
+                         roundWinners.length === 2 && 
+                         !localGameActive;
 
   return (
     <div style={styles.boxingRing}>
@@ -69,7 +85,7 @@ function BoxingRing({
       
       <div style={styles.roundBanner}>
         {currentRound === 1 ? 
-          `SEMI-FINALS (Match ${activePairingIndex + 1} of 2)` : 
+          (pairings.length > 1 ? `SEMI-FINALS (Match ${activePairingIndex + 1} of 2)` : "SEMI-FINALS") : 
           "CHAMPIONSHIP FINAL"
         }
       </div>
@@ -79,14 +95,14 @@ function BoxingRing({
           isPlayerActive(player.id) && (
             <PlayerCard
               key={player.id}
-              player={player} // Player already has reduced health
+              player={player}
               playerName={player.name}
               isActive={isPlayerActive(player.id)}
               isStunned={isPlayerStunned(player.id)}
               isWinner={winner === player.id}
               isChampion={currentRound === 2 && winner === player.id}
               advancesToFinal={currentRound === 1 && roundWinners.includes(player.id)}
-              gameActive={gameActive}
+              gameActive={localGameActive}
               availablePowerUp={availablePowerUps[player.id]}
               activePowerUps={activePowerUps[player.id] || []}
               opponentInfo={getOpponent(player.id) ? getOpponent(player.id).name : null}
@@ -99,7 +115,7 @@ function BoxingRing({
         ))}
       </div>
       
-      {currentRound === 1 && roundWinners.length === 1 && !gameActive && pairings.length > 1 && activePairingIndex === 0 && (
+      {showContinueButton && (
         <div style={styles.gameResult}>
           <h2 style={styles.resultText}>
             First Semi-Final Complete!
@@ -116,7 +132,7 @@ function BoxingRing({
         </div>
       )}
       
-      {currentRound === 1 && roundWinners.length === 2 && !gameActive && (
+      {showFinalButton && (
         <div style={styles.gameResult}>
           <h2 style={styles.resultText}>
             Semi-Finals Complete!
