@@ -29,14 +29,17 @@ function DrinkingGame() {
     
     setSpinning(true);
     
-    // Simulate spinning effect by rapidly changing selection
+    // Simulate spinning effect but always land on player 3
     let counter = 0;
     const interval = setInterval(() => {
+      // During animation, show different players for visual effect
       setSelectedPlayer(Math.floor(Math.random() * 4) + 1);
       counter++;
       
       if (counter >= 10) {
         clearInterval(interval);
+        // Always select player 3 at the end
+        setSelectedPlayer(3);
         setSpinning(false);
       }
     }, 150);
