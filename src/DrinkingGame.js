@@ -37,6 +37,7 @@ function DrinkingGame() {
   const [availablePowerUps, setAvailablePowerUps] = useState({}); // { playerId: powerUpType }
   const [powerUpTimer, setPowerUpTimer] = useState(null);
   const [stunned, setStunned] = useState({});
+  const [powerUpToUse, setPowerUpToUse] = useState(null); // New state to track which power-up to use
 
   // Handle name change
   const handleNameChange = (id, newName) => {
@@ -172,10 +173,17 @@ function DrinkingGame() {
     setPowerUpTimer(timer);
   };
 
-  // Use a power-up
-  const usePowerUp = (playerId) => {
+  // Use power-up effect hook - runs when powerUpToUse changes
+  useEffect(() => {
+    if (!powerUpToUse) return;
+    
+    const playerId = powerUpToUse;
     const powerUp = availablePowerUps[playerId];
-    if (!powerUp) return;
+    
+    if (!powerUp) {
+      setPowerUpToUse(null);
+      return;
+    }
     
     // Apply power-up effect based on type
     switch (powerUp.id) {
@@ -239,7 +247,11 @@ function DrinkingGame() {
       delete newPowerUps[playerId];
       return newPowerUps;
     });
-  };
+    
+    // Reset powerUpToUse after applying the effect
+    setPowerUpToUse(null);
+    
+  }, [powerUpToUse, availablePowerUps]); // Dependencies for the effect
 
   // Calculate damage based on active power-ups
   const calculateDamage = (playerId) => {
@@ -546,7 +558,7 @@ function DrinkingGame() {
                       </div>
                       <button 
                         style={styles.powerUpButton}
-                        onClick={() => usePowerUp(player.id)}
+                        onClick={() => setPowerUpToUse(player.id)}
                       >
                         Use Power-up!
                       </button>
