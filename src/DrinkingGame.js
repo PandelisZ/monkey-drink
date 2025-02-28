@@ -1,89 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 function DrinkingGame() {
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
-  const [spinning, setSpinning] = useState(false);
+  // Player data with health and clicks
+  const initialPlayers = [
+    { id: 1, name: "Player 1", emoji: "🦍", health: 100, clicks: 0 },
+    { id: 2, name: "Player 2", emoji: "🦍", health: 100, clicks: 0 },
+    { id: 3, name: "Player 3", emoji: "🦍", health: 100, clicks: 0 },
+    { id: 4, name: "Player 4", emoji: "🦍", health: 100, clicks: 0 }
+  ];
+
+  // State variables
+  const [players, setPlayers] = useState(initialPlayers);
   const [playerNames, setPlayerNames] = useState({
     1: "Player 1",
     2: "Player 2",
     3: "Player 3",
     4: "Player 4"
   });
-  const [showQuestion, setShowQuestion] = useState(false);
-  const [currentQuestion, setCurrentQuestion] = useState(null);
-  const [playerAnswer, setPlayerAnswer] = useState('');
-  const [answerResult, setAnswerResult] = useState(null); // 'correct', 'incorrect', or null
-  
-  const players = [
-    { id: 1, emoji: "🦍" },
-    { id: 2, emoji: "🦍" },
-    { id: 3, emoji: "🦍" },
-    { id: 4, emoji: "🦍" }
-  ];
+  const [gameActive, setGameActive] = useState(false);
+  const [gameEnded, setGameEnded] = useState(false);
+  const [winner, setWinner] = useState(null);
+  const [countdown, setCountdown] = useState(3);
+  const [pairings, setPairings] = useState([]);
 
-  const questions = [
-    { 
-      question: "Which BBC sci-fi comedy featured a character named Arnold Judas Rimmer?", 
-      answer: "Red Dwarf" 
-    },
-    { 
-      question: "In 'Blackadder Goes Forth', what was Lieutenant George's full name?", 
-      answer: "George Colthurst St. Barleigh" 
-    },
-    { 
-      question: "Which BBC show featured a time traveling police box called the TARDIS?", 
-      answer: "Doctor Who" 
-    },
-    { 
-      question: "In the BBC series 'Blake's 7', what was the name of the sentient computer on board the Liberator?", 
-      answer: "Zen" 
-    },
-    { 
-      question: "Which 80s BBC comedy featured the characters of Vyvyan, Rick, Neil, and Mike living in a shared house?", 
-      answer: "The Young Ones" 
-    },
-    { 
-      question: "Who played the lead role of Jim Hacker in 'Yes Minister'?", 
-      answer: "Paul Eddington" 
-    },
-    { 
-      question: "What was the name of the spaceship in the BBC series 'Blake's 7'?", 
-      answer: "Liberator" 
-    },
-    { 
-      question: "Which BBC comedy featured the Trotters living in Peckham?", 
-      answer: "Only Fools and Horses" 
-    },
-    { 
-      question: "In the BBC series 'Edge of Darkness', what was Bob Peck's character investigating?", 
-      answer: "His daughter's murder" 
-    },
-    { 
-      question: "Which BBC comedy series starred Penelope Keith as Audrey fforbes-Hamilton?", 
-      answer: "To the Manor Born" 
-    },
-    {
-      question: "What was the name of the pub in the BBC sitcom 'Allo 'Allo!?",
-      answer: "Café René"
-    },
-    {
-      question: "Which actor played the seventh Doctor in the classic Doctor Who series?",
-      answer: "Sylvester McCoy"
-    },
-    {
-      question: "In 'Blackadder II', what was Lord Blackadder's first name?",
-      answer: "Edmund"
-    },
-    {
-      question: "Which BBC comedy featured a decrepit seaside hotel run by Basil Fawlty?",
-      answer: "Fawlty Towers"
-    },
-    {
-      question: "What was the name of Del Boy's younger brother in 'Only Fools and Horses'?",
-      answer: "Rodney"
-    }
-  ];
-
+  // Handle name change
   const handleNameChange = (id, newName) => {
     setPlayerNames(prevNames => ({
       ...prevNames,
@@ -91,137 +31,245 @@ function DrinkingGame() {
     }));
   };
 
-  const randomizePlayer = () => {
-    if (spinning) return;
+  // Start the boxing match
+  const startGame = () => {
+    // Reset player stats
+    setPlayers(initialPlayers.map(player => ({
+      ...player,
+      health: 100,
+      clicks: 0,
+      name: playerNames[player.id]
+    })));
     
-    setSpinning(true);
-    setShowQuestion(false);
-    setAnswerResult(null);
-    setPlayerAnswer('');
+    // Create random pairings
+    const shuffledPlayers = [...initialPlayers].sort(() => Math.random() - 0.5);
+    const newPairings = [
+      [shuffledPlayers[0].id, shuffledPlayers[1].id],
+      [shuffledPlayers[2].id, shuffledPlayers[3].id]
+    ];
+    setPairings(newPairings);
     
-    // Simulate spinning effect
-    let counter = 0;
-    const interval = setInterval(() => {
-      // During animation, show different players for visual effect
-      setSelectedPlayer(Math.floor(Math.random() * 4) + 1);
-      counter++;
+    // Start countdown
+    setGameEnded(false);
+    setWinner(null);
+    setCountdown(3);
+    
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setGameActive(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Handle player clicks
+  const handleClick = (playerId) => {
+    if (!gameActive || gameEnded) return;
+    
+    setPlayers(prevPlayers => {
+      const updatedPlayers = [...prevPlayers];
       
-      if (counter >= 10) {
-        clearInterval(interval);
-        // Randomly select any player
-        const randomPlayer = Math.floor(Math.random() * 4) + 1;
-        setSelectedPlayer(randomPlayer);
-        setSpinning(false);
-        
-        // Select a random question
-        const randomQuestionIndex = Math.floor(Math.random() * questions.length);
-        setCurrentQuestion(questions[randomQuestionIndex]);
-        setShowQuestion(true);
+      // Find the current player and their opponent
+      const playerIndex = updatedPlayers.findIndex(p => p.id === playerId);
+      const player = updatedPlayers[playerIndex];
+      
+      // Find opponent based on pairings
+      const pairingWithPlayer = pairings.find(pair => pair.includes(playerId));
+      const opponentId = pairingWithPlayer.find(id => id !== playerId);
+      const opponentIndex = updatedPlayers.findIndex(p => p.id === opponentId);
+      const opponent = updatedPlayers[opponentIndex];
+      
+      // Update clicks and reduce opponent health
+      player.clicks += 1;
+      opponent.health = Math.max(0, opponent.health - 1);
+      
+      // Check for winner
+      if (opponent.health <= 0 && !gameEnded) {
+        setGameEnded(true);
+        setGameActive(false);
+        setWinner(player.id);
       }
-    }, 150);
+      
+      return updatedPlayers;
+    });
   };
 
-  const handleAnswerSubmit = () => {
-    if (!currentQuestion) return;
-    
-    // Compare answer (case insensitive)
-    if (playerAnswer.trim().toLowerCase() === currentQuestion.answer.toLowerCase()) {
-      setAnswerResult('correct');
-    } else {
-      setAnswerResult('incorrect');
+  // Reset the game
+  const resetGame = () => {
+    setPlayers(initialPlayers.map(player => ({
+      ...player,
+      health: 100,
+      clicks: 0
+    })));
+    setGameActive(false);
+    setGameEnded(false);
+    setWinner(null);
+  };
+
+  // Get opponent for a player
+  const getOpponent = (playerId) => {
+    if (!pairings.length) return null;
+    const pairingWithPlayer = pairings.find(pair => pair.includes(playerId));
+    if (!pairingWithPlayer) return null;
+    const opponentId = pairingWithPlayer.find(id => id !== playerId);
+    return players.find(p => p.id === opponentId);
+  };
+
+  // Check if player is in semifinals or finals
+  const isPlayerActive = (playerId) => {
+    if (!pairings.length) return false;
+    return pairings.some(pair => pair.includes(playerId));
+  };
+
+  // When game ends, find the winners and set up the final match
+  useEffect(() => {
+    if (gameEnded && pairings.length === 2 && !winner) {
+      // First round ended, set up final match
+      const winners = pairings.map(pair => {
+        const player1 = players.find(p => p.id === pair[0]);
+        const player2 = players.find(p => p.id === pair[1]);
+        return player1.health <= 0 ? player2.id : player1.id;
+      });
+      
+      // Reset for the final match
+      setPairings([winners]);
+      setPlayers(prevPlayers => 
+        prevPlayers.map(player => ({
+          ...player,
+          health: 100,
+          clicks: 0
+        }))
+      );
+      setGameEnded(false);
     }
-  };
-
-  const resetQuestion = () => {
-    setShowQuestion(false);
-    setCurrentQuestion(null);
-    setPlayerAnswer('');
-    setAnswerResult(null);
-  };
+  }, [gameEnded, pairings, players, winner]);
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>Mad Gorilla Drinking Game 🦍🍻</h1>
+      <h1 style={styles.title}>Mad Gorilla Boxing 🦍👊</h1>
       
-      <div style={styles.playersContainer}>
-        {players.map(player => (
-          <div 
-            key={player.id}
-            style={{
-              ...styles.playerCard,
-              ...(selectedPlayer === player.id ? styles.selectedPlayer : {})
-            }}
-          >
-            <div style={styles.emoji}>{player.emoji}</div>
-            <input
-              type="text"
-              value={playerNames[player.id]}
-              onChange={(e) => handleNameChange(player.id, e.target.value)}
-              style={styles.nameInput}
-              placeholder="Enter gorilla name"
-            />
-            {selectedPlayer === player.id && !showQuestion && !answerResult && (
-              <div style={styles.selectionMessage}>Selected!</div>
-            )}
-            {selectedPlayer === player.id && answerResult === 'correct' && (
-              <div style={styles.correctMessage}>Correct! You're safe! 🎉</div>
-            )}
-            {selectedPlayer === player.id && answerResult === 'incorrect' && (
-              <div style={styles.drinkMessage}>WRONG! DRINK! 🍺</div>
-            )}
-          </div>
-        ))}
-      </div>
-      
-      {showQuestion && selectedPlayer && currentQuestion && (
-        <div style={styles.questionContainer}>
-          <h3 style={styles.questionTitle}>
-            Question for {playerNames[selectedPlayer]}:
-          </h3>
-          <p style={styles.questionText}>{currentQuestion.question}</p>
-          {!answerResult && (
-            <>
-              <input 
-                type="text" 
-                value={playerAnswer}
-                onChange={(e) => setPlayerAnswer(e.target.value)}
-                style={styles.answerInput}
-                placeholder="Your answer..."
-              />
-              <button 
-                onClick={handleAnswerSubmit}
-                style={styles.answerButton}
+      {!gameActive && !gameEnded && countdown === 3 && (
+        <div style={styles.setupSection}>
+          <div style={styles.playersContainer}>
+            {players.map(player => (
+              <div 
+                key={player.id}
+                style={styles.playerCard}
               >
-                Submit Answer
+                <div style={styles.emoji}>{player.emoji}</div>
+                <input
+                  type="text"
+                  value={playerNames[player.id]}
+                  onChange={(e) => handleNameChange(player.id, e.target.value)}
+                  style={styles.nameInput}
+                  placeholder="Enter gorilla name"
+                />
+              </div>
+            ))}
+          </div>
+          
+          <button 
+            style={styles.startButton} 
+            onClick={startGame}
+          >
+            Start Boxing Match!
+          </button>
+        </div>
+      )}
+      
+      {countdown > 0 && countdown < 3 && (
+        <div style={styles.countdownContainer}>
+          <h2 style={styles.countdown}>Get Ready: {countdown}</h2>
+        </div>
+      )}
+      
+      {(gameActive || gameEnded) && (
+        <div style={styles.boxingRing}>
+          <div style={styles.ringRopes}></div>
+          
+          <div style={styles.playersContainer}>
+            {players.map(player => (
+              isPlayerActive(player.id) && (
+                <div 
+                  key={player.id}
+                  style={{
+                    ...styles.boxerCard,
+                    ...(winner === player.id ? styles.winnerCard : {})
+                  }}
+                >
+                  <div style={styles.boxerTop}>
+                    <div style={styles.emoji}>{player.emoji}</div>
+                    <div style={styles.boxerName}>{playerNames[player.id]}</div>
+                  </div>
+                  
+                  <div style={styles.healthBarContainer}>
+                    <div style={{
+                      ...styles.healthBar,
+                      width: `${player.health}%`,
+                      backgroundColor: player.health > 50 ? '#4CAF50' : 
+                                      player.health > 25 ? '#FFC107' : '#FF5722'
+                    }}></div>
+                    <span style={styles.healthText}>{player.health}%</span>
+                  </div>
+                  
+                  <div style={styles.clicksCounter}>
+                    Punches: {player.clicks}
+                  </div>
+                  
+                  {gameActive && (
+                    <button 
+                      style={styles.punchButton}
+                      onClick={() => handleClick(player.id)}
+                    >
+                      PUNCH! 👊
+                    </button>
+                  )}
+                  
+                  {winner === player.id && (
+                    <div style={styles.winnerBadge}>WINNER! 🏆</div>
+                  )}
+                  
+                  {getOpponent(player.id) && (
+                    <div style={styles.vsContainer}>
+                      <span style={styles.vsText}>VS</span>
+                      <div style={styles.opponentInfo}>
+                        {playerNames[getOpponent(player.id).id]}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            ))}
+          </div>
+          
+          {gameEnded && winner && (
+            <div style={styles.gameResult}>
+              <h2 style={styles.resultText}>
+                {playerNames[winner]} wins the boxing match!
+              </h2>
+              <button 
+                style={styles.resetButton}
+                onClick={resetGame}
+              >
+                New Match
               </button>
-            </>
-          )}
-          {answerResult && (
-            <button 
-              onClick={resetQuestion}
-              style={styles.nextButton}
-            >
-              Next Round
-            </button>
+            </div>
           )}
         </div>
       )}
       
-      <button 
-        style={spinning ? styles.spinningButton : styles.spinButton} 
-        onClick={randomizePlayer}
-        disabled={spinning || (showQuestion && !answerResult)}
-      >
-        {spinning ? "Spinning..." : "Spin the Mad Gorilla! 🦍"}
-      </button>
-      
       <div style={styles.instructions}>
         <p>How to play:</p>
         <ol>
-          <li>Gather 4 players and name your gorillas</li>
-          <li>Press the "Spin" button</li>
-          <li>The selected gorilla must answer a trivia question about obscure BBC TV shows from the 80s</li>
-          <li>Answer correctly to be safe, or drink if you're wrong! 🍻</li>
+          <li>Name your gorillas</li>
+          <li>Click "Start Boxing Match"</li>
+          <li>When countdown ends, click the PUNCH button as fast as you can</li>
+          <li>Deplete your opponent's health to win</li>
+          <li>Winners advance to the championship!</li>
         </ol>
       </div>
     </div>
@@ -230,7 +278,7 @@ function DrinkingGame() {
 
 const styles = {
   container: {
-    maxWidth: '800px',
+    maxWidth: '900px',
     margin: '0 auto',
     padding: '20px',
     fontFamily: 'Arial, sans-serif',
@@ -241,6 +289,9 @@ const styles = {
   },
   title: {
     color: '#333',
+    marginBottom: '30px'
+  },
+  setupSection: {
     marginBottom: '30px'
   },
   playersContainer: {
@@ -258,14 +309,124 @@ const styles = {
     boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
     transition: 'all 0.3s ease'
   },
-  selectedPlayer: {
-    backgroundColor: '#ffdb58',
-    transform: 'scale(1.05)',
-    boxShadow: '0 4px 10px rgba(0,0,0,0.2)'
+  boxingRing: {
+    position: 'relative',
+    backgroundColor: '#8B4513',
+    borderRadius: '10px',
+    padding: '40px 20px',
+    marginBottom: '30px',
+    border: '15px solid #A0522D',
+    boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5), 0 10px 20px rgba(0,0,0,0.3)',
+    overflow: 'hidden'
+  },
+  ringRopes: {
+    position: 'absolute',
+    top: '0',
+    left: '0',
+    right: '0',
+    bottom: '0',
+    borderTop: '6px solid #FFD700',
+    borderBottom: '6px solid #FFD700',
+    pointerEvents: 'none',
+    zIndex: 1
+  },
+  boxerCard: {
+    width: '200px',
+    padding: '20px',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: '8px',
+    boxShadow: '0 5px 15px rgba(0,0,0,0.2)',
+    transition: 'all 0.3s ease',
+    position: 'relative',
+    zIndex: 2
+  },
+  winnerCard: {
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    boxShadow: '0 5px 20px rgba(255, 215, 0, 0.5)'
+  },
+  boxerTop: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    marginBottom: '10px'
+  },
+  boxerName: {
+    fontWeight: 'bold',
+    fontSize: '18px',
+    margin: '10px 0'
   },
   emoji: {
-    fontSize: '50px',
+    fontSize: '60px',
     marginBottom: '10px'
+  },
+  healthBarContainer: {
+    width: '100%',
+    height: '20px',
+    backgroundColor: '#e0e0e0',
+    borderRadius: '10px',
+    margin: '10px 0',
+    position: 'relative',
+    overflow: 'hidden'
+  },
+  healthBar: {
+    height: '100%',
+    transition: 'width 0.3s ease, background-color 0.3s ease'
+  },
+  healthText: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: 'translate(-50%, -50%)',
+    color: '#333',
+    fontWeight: 'bold',
+    fontSize: '12px',
+    textShadow: '0 0 3px #fff'
+  },
+  clicksCounter: {
+    fontSize: '14px',
+    marginBottom: '10px'
+  },
+  punchButton: {
+    width: '100%',
+    padding: '15px',
+    backgroundColor: '#d32f2f',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontSize: '16px',
+    fontWeight: 'bold',
+    marginTop: '10px',
+    boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
+    transition: 'all 0.1s ease'
+  },
+  winnerBadge: {
+    position: 'absolute',
+    top: '-15px',
+    right: '-15px',
+    backgroundColor: '#FFD700',
+    color: '#333',
+    padding: '5px 10px',
+    borderRadius: '20px',
+    fontWeight: 'bold',
+    boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
+    zIndex: 3
+  },
+  vsContainer: {
+    marginTop: '15px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center'
+  },
+  vsText: {
+    fontWeight: 'bold',
+    color: '#d32f2f',
+    fontSize: '24px',
+    marginBottom: '5px'
+  },
+  opponentInfo: {
+    fontStyle: 'italic',
+    fontSize: '14px'
   },
   nameInput: {
     width: '90%',
@@ -276,90 +437,56 @@ const styles = {
     fontSize: '14px',
     textAlign: 'center'
   },
-  selectionMessage: {
-    marginTop: '10px',
-    fontWeight: 'bold',
-    color: '#333'
-  },
-  drinkMessage: {
-    marginTop: '10px',
-    fontWeight: 'bold',
-    color: '#ff4500'
-  },
-  correctMessage: {
-    marginTop: '10px',
-    fontWeight: 'bold',
-    color: '#4CAF50'
-  },
-  questionContainer: {
-    backgroundColor: '#fff',
-    borderRadius: '8px',
-    padding: '20px',
-    marginBottom: '20px',
-    boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
-  },
-  questionTitle: {
-    color: '#333',
-    marginBottom: '10px'
-  },
-  questionText: {
+  startButton: {
+    padding: '15px 30px',
     fontSize: '18px',
-    margin: '15px 0',
-    fontWeight: 'bold'
-  },
-  answerInput: {
-    width: '70%',
-    padding: '10px',
-    margin: '10px auto',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '16px'
-  },
-  answerButton: {
-    padding: '10px 20px',
     backgroundColor: '#4CAF50',
     color: 'white',
     border: 'none',
     borderRadius: '5px',
     cursor: 'pointer',
-    fontSize: '16px',
-    margin: '10px'
+    transition: 'background-color 0.3s ease',
+    boxShadow: '0 3px 5px rgba(0,0,0,0.2)'
   },
-  nextButton: {
+  resetButton: {
     padding: '10px 20px',
+    fontSize: '16px',
     backgroundColor: '#2196F3',
     color: 'white',
     border: 'none',
     borderRadius: '5px',
     cursor: 'pointer',
-    fontSize: '16px',
-    margin: '10px'
+    marginTop: '20px',
+    boxShadow: '0 3px 5px rgba(0,0,0,0.2)'
   },
-  spinButton: {
-    padding: '15px 30px',
-    fontSize: '18px',
-    backgroundColor: '#4CAF50',
-    color: 'white',
-    border: 'none',
-    borderRadius: '5px',
-    cursor: 'pointer',
-    transition: 'background-color 0.3s ease'
+  gameResult: {
+    marginTop: '30px',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: '20px',
+    borderRadius: '8px',
+    boxShadow: '0 5px 15px rgba(0,0,0,0.2)'
   },
-  spinningButton: {
-    padding: '15px 30px',
-    fontSize: '18px',
-    backgroundColor: '#cccccc',
-    color: '#666666',
-    border: 'none',
-    borderRadius: '5px',
-    cursor: 'not-allowed'
+  resultText: {
+    color: '#333',
+    marginBottom: '10px'
+  },
+  countdownContainer: {
+    margin: '30px 0',
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    padding: '30px',
+    borderRadius: '8px'
+  },
+  countdown: {
+    color: '#fff',
+    fontSize: '36px'
   },
   instructions: {
     marginTop: '40px',
     textAlign: 'left',
     backgroundColor: '#fff',
     padding: '20px',
-    borderRadius: '8px'
+    borderRadius: '8px',
+    boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
   }
 };
 
