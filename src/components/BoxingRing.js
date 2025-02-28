@@ -22,6 +22,16 @@ function BoxingRing({
   // State to track which pairing is currently shown in the first round
   const [activePairingIndex, setActivePairingIndex] = useState(0);
   const [localGameActive, setLocalGameActive] = useState(gameActive);
+  const [playerPowerUps, setPlayerPowerUps] = useState({});
+  
+  // Define power-ups data
+  const powerUpsData = [
+    { id: 'doubleDamage', name: 'Double Damage', emoji: '⚡', effect: 'Your punches do 2x damage!', duration: 5 },
+    { id: 'heal', name: 'Healing', emoji: '❤️', effect: 'Recover 20% health!', duration: 0 },
+    { id: 'shield', name: 'Shield', emoji: '🛡️', effect: 'Block 50% of incoming damage!', duration: 3 },
+    { id: 'criticalHit', name: 'Critical Hit', emoji: '🔥', effect: 'Your next punch does 5x damage!', duration: 1 },
+    { id: 'stun', name: 'Stun', emoji: '💫', effect: 'Opponent cannot attack for 2 seconds!', duration: 2 }
+  ];
   
   // Update local state when props change
   useEffect(() => {
@@ -61,11 +71,116 @@ function BoxingRing({
     setLocalGameActive(true);
   };
 
+  // Function to use a power-up
+  const usePowerUp = (playerId, powerUpId) => {
+    if (!localGameActive || gameEnded) return;
+    
+    // Find the power-up data
+    const powerUp = powerUpsData.find(pu => pu.id === powerUpId);
+    if (!powerUp) return;
+    
+    // Apply power-up effect based on type
+    switch (powerUp.id) {
+      case 'doubleDamage':
+        setPlayerPowerUps(prev => ({
+          ...prev,
+          [playerId]: [...(prev[playerId] || []), {
+            type: powerUp,
+            endsAt: Date.now() + (powerUp.duration * 1000)
+          }]
+        }));
+        // Call the parent component's function to set the power-up
+        setPowerUpToUse(playerId);
+        break;
+      case 'heal':
+        // Update player health in the parent component
+        setPowerUpToUse(playerId);
+        break;
+      case 'shield':
+        setPlayerPowerUps(prev => ({
+          ...prev,
+          [playerId]: [...(prev[playerId] || []), {
+            type: powerUp,
+            endsAt: Date.now() + (powerUp.duration * 1000)
+          }]
+        }));
+        setPowerUpToUse(playerId);
+        break;
+      case 'criticalHit':
+        setPlayerPowerUps(prev => ({
+          ...prev,
+          [playerId]: [...(prev[playerId] || []), {
+            type: powerUp,
+            endsAt: Date.now() + (powerUp.duration * 1000)
+          }]
+        }));
+        setPowerUpToUse(playerId);
+        break;
+      case 'stun':
+        // Find opponent and stun them
+        const opponentId = getOpponent(playerId)?.id;
+        if (opponentId) {
+          // Update stunned state in the parent component
+          setPowerUpToUse(playerId);
+        }
+        break;
+      default:
+        break;
+    }
+  };
+
+  // PowerUpButton component
+  const PowerUpButton = ({ playerId, powerUp }) => {
+    return (
+      <button
+        style={styles.powerUpButton}
+        onClick={() => usePowerUp(playerId, powerUp.id)}
+        disabled={!localGameActive || gameEnded}
+      >
+        <div>{powerUp.emoji}</div>
+        <div>{powerUp.name}</div>
+        <small>{powerUp.effect}</small>
+      </button>
+    );
+  };
+
   // Create players with reduced health
   const playersWithReducedHealth = players.map(player => ({
     ...player,
     health: player.health > 50 ? 50 : player.health // Ensure health doesn't exceed 50
   }));
+
+  // Randomly assign power-ups to active players
+  useEffect(() => {
+    if (!localGameActive || gameEnded) return;
+    
+    const assignPowerUps = () => {
+      // Get all active player IDs
+      const activePlayerIds = playersWithReducedHealth
+        .filter(player => isPlayerActive(player.id))
+        .map(player => player.id);
+      
+      // For each active player, there's a 30% chance to get a power-up
+      activePlayerIds.forEach(playerId => {
+        if (Math.random() < 0.3 && !availablePowerUps[playerId]) {
+          // Select a random power-up
+          const randomPowerUpIndex = Math.floor(Math.random() * powerUpsData.length);
+          const powerUp = powerUpsData[randomPowerUpIndex];
+          
+          // Update availablePowerUps in parent component
+          if (setPowerUpToUse) {
+            // This would normally update availablePowerUps, but we're simulating it here
+            // In a real implementation, you'd call a function from props that updates availablePowerUps
+          }
+        }
+      });
+    };
+    
+    // Assign power-ups every 3 seconds
+    const powerUpInterval = setInterval(assignPowerUps, 3000);
+    
+    return () => clearInterval(powerUpInterval);
+  }, [localGameActive, gameEnded, availablePowerUps, playersWithReducedHealth]);
 
   // Determine if we're showing the "continue to second semi-final" button
   const showContinueButton = currentRound === 1 && 
@@ -93,24 +208,44 @@ function BoxingRing({
       <div style={styles.playersContainer}>
         {playersWithReducedHealth.map(player => (
           isPlayerActive(player.id) && (
-            <PlayerCard
-              key={player.id}
-              player={player}
-              playerName={player.name}
-              isActive={isPlayerActive(player.id)}
-              isStunned={isPlayerStunned(player.id)}
-              isWinner={winner === player.id}
-              isChampion={currentRound === 2 && winner === player.id}
-              advancesToFinal={currentRound === 1 && roundWinners.includes(player.id)}
-              gameActive={localGameActive}
-              availablePowerUp={availablePowerUps[player.id]}
-              activePowerUps={activePowerUps[player.id] || []}
-              opponentInfo={getOpponent(player.id) ? getOpponent(player.id).name : null}
-              onPunchClick={handleClick}
-              onUsePowerUp={setPowerUpToUse}
-              currentRound={currentRound}
-              styles={styles}
-            />
+            <div key={player.id} style={styles.playerColumn}>
+              <PlayerCard
+                player={player}
+                playerName={player.name}
+                isActive={isPlayerActive(player.id)}
+                isStunned={isPlayerStunned(player.id)}
+                isWinner={winner === player.id}
+                isChampion={currentRound === 2 && winner === player.id}
+                advancesToFinal={currentRound === 1 && roundWinners.includes(player.id)}
+                gameActive={localGameActive}
+                availablePowerUp={availablePowerUps[player.id]}
+                activePowerUps={activePowerUps[player.id] || []}
+                opponentInfo={getOpponent(player.id) ? getOpponent(player.id).name : null}
+                onPunchClick={handleClick}
+                onUsePowerUp={setPowerUpToUse}
+                currentRound={currentRound}
+                styles={styles}
+              />
+              
+              {/* Power-up section */}
+              {localGameActive && !gameEnded && (
+                <div style={styles.powerUpsSection}>
+                  <h3 style={styles.powerUpsTitle}>Power-Ups</h3>
+                  <div style={styles.powerUpsGrid}>
+                    {powerUpsData.map((powerUp, index) => (
+                      // Only show a power-up button with 40% probability to simulate randomness
+                      Math.random() < 0.4 && (
+                        <PowerUpButton 
+                          key={index} 
+                          playerId={player.id} 
+                          powerUp={powerUp} 
+                        />
+                      )
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           )
         ))}
       </div>
@@ -165,5 +300,48 @@ function BoxingRing({
     </div>
   );
 }
+
+// Add new styles for power-ups
+const powerUpStyles = {
+  powerUpsSection: {
+    marginTop: '15px',
+    padding: '10px',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: '8px',
+    boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+  },
+  powerUpsTitle: {
+    fontSize: '16px',
+    marginBottom: '8px',
+    color: '#333'
+  },
+  powerUpsGrid: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: '8px',
+    justifyContent: 'center'
+  },
+  powerUpButton: {
+    padding: '8px',
+    backgroundColor: '#e3f2fd',
+    border: '2px solid #90caf9',
+    borderRadius: '5px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    fontSize: '12px',
+    width: '80px',
+    height: '80px',
+    justifyContent: 'center'
+  },
+  playerColumn: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    margin: '0 10px'
+  }
+};
 
 export default BoxingRing;
