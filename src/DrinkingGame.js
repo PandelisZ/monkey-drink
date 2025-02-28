@@ -9,12 +9,59 @@ function DrinkingGame() {
     3: "Player 3",
     4: "Player 4"
   });
+  const [showQuestion, setShowQuestion] = useState(false);
+  const [currentQuestion, setCurrentQuestion] = useState(null);
+  const [playerAnswer, setPlayerAnswer] = useState('');
+  const [answerResult, setAnswerResult] = useState(null); // 'correct', 'incorrect', or null
   
   const players = [
     { id: 1, emoji: "🦍" },
     { id: 2, emoji: "🦍" },
     { id: 3, emoji: "🦍" },
     { id: 4, emoji: "🦍" }
+  ];
+
+  const questions = [
+    { 
+      question: "Where did Sam and Emily have their first date?", 
+      answer: "Italian restaurant" 
+    },
+    { 
+      question: "What is Emily's favorite color that Sam always forgets?", 
+      answer: "Purple" 
+    },
+    { 
+      question: "What's the name of Sam and Emily's pet?", 
+      answer: "Whiskers" 
+    },
+    { 
+      question: "What anniversary gift did Sam forget last year?", 
+      answer: "Flowers" 
+    },
+    { 
+      question: "What food does Emily hate that Sam keeps cooking?", 
+      answer: "Brussels sprouts" 
+    },
+    { 
+      question: "Where are Sam and Emily planning their next vacation?", 
+      answer: "Hawaii" 
+    },
+    { 
+      question: "What TV show do Sam and Emily always argue about?", 
+      answer: "Game of Thrones" 
+    },
+    { 
+      question: "What embarrassing nickname does Emily call Sam?", 
+      answer: "Sammy Bear" 
+    },
+    { 
+      question: "What did Sam break of Emily's that he tried to hide?", 
+      answer: "Favorite mug" 
+    },
+    { 
+      question: "How many times has Sam been late to date night in the past month?", 
+      answer: "Three" 
+    }
   ];
 
   const handleNameChange = (id, newName) => {
@@ -28,6 +75,9 @@ function DrinkingGame() {
     if (spinning) return;
     
     setSpinning(true);
+    setShowQuestion(false);
+    setAnswerResult(null);
+    setPlayerAnswer('');
     
     // Simulate spinning effect but always land on player 3
     let counter = 0;
@@ -41,8 +91,31 @@ function DrinkingGame() {
         // Always select player 3 at the end
         setSelectedPlayer(3);
         setSpinning(false);
+        
+        // Select a random question
+        const randomQuestionIndex = Math.floor(Math.random() * questions.length);
+        setCurrentQuestion(questions[randomQuestionIndex]);
+        setShowQuestion(true);
       }
     }, 150);
+  };
+
+  const handleAnswerSubmit = () => {
+    if (!currentQuestion) return;
+    
+    // Compare answer (case insensitive)
+    if (playerAnswer.trim().toLowerCase() === currentQuestion.answer.toLowerCase()) {
+      setAnswerResult('correct');
+    } else {
+      setAnswerResult('incorrect');
+    }
+  };
+
+  const resetQuestion = () => {
+    setShowQuestion(false);
+    setCurrentQuestion(null);
+    setPlayerAnswer('');
+    setAnswerResult(null);
   };
 
   return (
@@ -66,17 +139,57 @@ function DrinkingGame() {
               style={styles.nameInput}
               placeholder="Enter gorilla name"
             />
-            {selectedPlayer === player.id && (
-              <div style={styles.drinkMessage}>DRINK! 🍺</div>
+            {selectedPlayer === player.id && !showQuestion && !answerResult && (
+              <div style={styles.selectionMessage}>Selected!</div>
+            )}
+            {selectedPlayer === player.id && answerResult === 'correct' && (
+              <div style={styles.correctMessage}>Correct! You're safe! 🎉</div>
+            )}
+            {selectedPlayer === player.id && answerResult === 'incorrect' && (
+              <div style={styles.drinkMessage}>WRONG! DRINK! 🍺</div>
             )}
           </div>
         ))}
       </div>
       
+      {showQuestion && selectedPlayer && currentQuestion && (
+        <div style={styles.questionContainer}>
+          <h3 style={styles.questionTitle}>
+            Question for {playerNames[selectedPlayer]}:
+          </h3>
+          <p style={styles.questionText}>{currentQuestion.question}</p>
+          {!answerResult && (
+            <>
+              <input 
+                type="text" 
+                value={playerAnswer}
+                onChange={(e) => setPlayerAnswer(e.target.value)}
+                style={styles.answerInput}
+                placeholder="Your answer..."
+              />
+              <button 
+                onClick={handleAnswerSubmit}
+                style={styles.answerButton}
+              >
+                Submit Answer
+              </button>
+            </>
+          )}
+          {answerResult && (
+            <button 
+              onClick={resetQuestion}
+              style={styles.nextButton}
+            >
+              Next Round
+            </button>
+          )}
+        </div>
+      )}
+      
       <button 
         style={spinning ? styles.spinningButton : styles.spinButton} 
         onClick={randomizePlayer}
-        disabled={spinning}
+        disabled={spinning || (showQuestion && !answerResult)}
       >
         {spinning ? "Spinning..." : "Spin the Mad Gorilla! 🦍"}
       </button>
@@ -86,8 +199,8 @@ function DrinkingGame() {
         <ol>
           <li>Gather 4 players and name your gorillas</li>
           <li>Press the "Spin" button</li>
-          <li>The selected gorilla must drink!</li>
-          <li>Repeat and enjoy responsibly 🍻</li>
+          <li>The selected gorilla must answer a personal question about Sam and Emily</li>
+          <li>Answer correctly to be safe, or drink if you're wrong! 🍻</li>
         </ol>
       </div>
     </div>
@@ -142,10 +255,64 @@ const styles = {
     fontSize: '14px',
     textAlign: 'center'
   },
+  selectionMessage: {
+    marginTop: '10px',
+    fontWeight: 'bold',
+    color: '#333'
+  },
   drinkMessage: {
     marginTop: '10px',
     fontWeight: 'bold',
     color: '#ff4500'
+  },
+  correctMessage: {
+    marginTop: '10px',
+    fontWeight: 'bold',
+    color: '#4CAF50'
+  },
+  questionContainer: {
+    backgroundColor: '#fff',
+    borderRadius: '8px',
+    padding: '20px',
+    marginBottom: '20px',
+    boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+  },
+  questionTitle: {
+    color: '#333',
+    marginBottom: '10px'
+  },
+  questionText: {
+    fontSize: '18px',
+    margin: '15px 0',
+    fontWeight: 'bold'
+  },
+  answerInput: {
+    width: '70%',
+    padding: '10px',
+    margin: '10px auto',
+    border: '1px solid #ddd',
+    borderRadius: '4px',
+    fontSize: '16px'
+  },
+  answerButton: {
+    padding: '10px 20px',
+    backgroundColor: '#4CAF50',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontSize: '16px',
+    margin: '10px'
+  },
+  nextButton: {
+    padding: '10px 20px',
+    backgroundColor: '#2196F3',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontSize: '16px',
+    margin: '10px'
   },
   spinButton: {
     padding: '15px 30px',
