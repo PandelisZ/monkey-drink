@@ -9,6 +9,15 @@ function DrinkingGame() {
     { id: 4, name: "Player 4", emoji: "🦍", health: 100, clicks: 0 }
   ];
 
+  // Power-ups definitions
+  const powerUpTypes = [
+    { id: 'doubleDamage', name: 'Double Damage', emoji: '⚡', effect: 'Your punches do 2x damage!', duration: 5 },
+    { id: 'heal', name: 'Healing', emoji: '❤️', effect: 'Recover 20% health!', duration: 0 },
+    { id: 'shield', name: 'Shield', emoji: '🛡️', effect: 'Block 50% of incoming damage!', duration: 3 },
+    { id: 'criticalHit', name: 'Critical Hit', emoji: '🔥', effect: 'Your next punch does 5x damage!', duration: 1 },
+    { id: 'stun', name: 'Stun', emoji: '💫', effect: 'Opponent cannot attack for 2 seconds!', duration: 2 }
+  ];
+
   // State variables
   const [players, setPlayers] = useState(initialPlayers);
   const [playerNames, setPlayerNames] = useState({
@@ -22,6 +31,12 @@ function DrinkingGame() {
   const [winner, setWinner] = useState(null);
   const [countdown, setCountdown] = useState(3);
   const [pairings, setPairings] = useState([]);
+  const [currentRound, setCurrentRound] = useState(0); // 0: not started, 1: first round, 2: final round
+  const [roundWinners, setRoundWinners] = useState([]);
+  const [activePowerUps, setActivePowerUps] = useState({}); // { playerId: [{type, endsAt}] }
+  const [availablePowerUps, setAvailablePowerUps] = useState({}); // { playerId: powerUpType }
+  const [powerUpTimer, setPowerUpTimer] = useState(null);
+  const [stunned, setStunned] = useState({});
 
   // Handle name change
   const handleNameChange = (id, newName) => {
@@ -41,7 +56,7 @@ function DrinkingGame() {
       name: playerNames[player.id]
     })));
     
-    // Create random pairings
+    // Create random pairings for first round
     const shuffledPlayers = [...initialPlayers].sort(() => Math.random() - 0.5);
     const newPairings = [
       [shuffledPlayers[0].id, shuffledPlayers[1].id],
@@ -49,16 +64,23 @@ function DrinkingGame() {
     ];
     setPairings(newPairings);
     
-    // Start countdown
+    // Set up game state
     setGameEnded(false);
     setWinner(null);
     setCountdown(3);
+    setCurrentRound(1);
+    setRoundWinners([]);
+    setActivePowerUps({});
+    setAvailablePowerUps({});
+    setStunned({});
     
     const timer = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
           clearInterval(timer);
           setGameActive(true);
+          // Start power-up generation
+          startPowerUpGeneration();
           return 0;
         }
         return prev - 1;
@@ -66,9 +88,246 @@ function DrinkingGame() {
     }, 1000);
   };
 
+  // Start second round with winners from first round
+  const startSecondRound = () => {
+    if (roundWinners.length !== 2) return;
+    
+    // Reset health and clicks for the two finalists
+    setPlayers(prevPlayers => 
+      prevPlayers.map(player => ({
+        ...player,
+        health: roundWinners.includes(player.id) ? 100 : player.health,
+        clicks: roundWinners.includes(player.id) ? 0 : player.clicks
+      }))
+    );
+    
+    // Set up final round pairing
+    setPairings([roundWinners]);
+    
+    // Reset game state for new round
+    setGameEnded(false);
+    setWinner(null);
+    setCountdown(3);
+    setCurrentRound(2);
+    setActivePowerUps({});
+    setAvailablePowerUps({});
+    setStunned({});
+    
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setGameActive(true);
+          // Start power-up generation
+          startPowerUpGeneration();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Generate random power-ups during the game
+  const startPowerUpGeneration = () => {
+    if (powerUpTimer) clearInterval(powerUpTimer);
+    
+    const timer = setInterval(() => {
+      if (!gameActive || gameEnded) {
+        clearInterval(timer);
+        return;
+      }
+      
+      // Get active players from current pairings
+      const activePlayers = pairings.flat();
+      
+      // Randomly decide if a power-up should appear (30% chance)
+      if (Math.random() < 0.3) {
+        // Select a random player to receive power-up
+        const randomPlayerIndex = Math.floor(Math.random() * activePlayers.length);
+        const playerId = activePlayers[randomPlayerIndex];
+        
+        // Select a random power-up
+        const randomPowerUpIndex = Math.floor(Math.random() * powerUpTypes.length);
+        const powerUp = powerUpTypes[randomPowerUpIndex];
+        
+        // Make power-up available to player
+        setAvailablePowerUps(prev => ({
+          ...prev,
+          [playerId]: powerUp
+        }));
+        
+        // Auto-remove power-up after 5 seconds if not collected
+        setTimeout(() => {
+          setAvailablePowerUps(prev => {
+            const newPowerUps = {...prev};
+            if (newPowerUps[playerId] === powerUp) {
+              delete newPowerUps[playerId];
+            }
+            return newPowerUps;
+          });
+        }, 5000);
+      }
+    }, 3000); // Generate power-up opportunity every 3 seconds
+    
+    setPowerUpTimer(timer);
+  };
+
+  // Use a power-up
+  const usePowerUp = (playerId) => {
+    const powerUp = availablePowerUps[playerId];
+    if (!powerUp) return;
+    
+    // Apply power-up effect based on type
+    switch (powerUp.id) {
+      case 'doubleDamage':
+        setActivePowerUps(prev => ({
+          ...prev,
+          [playerId]: [...(prev[playerId] || []), {
+            type: powerUp,
+            endsAt: Date.now() + (powerUp.duration * 1000)
+          }]
+        }));
+        break;
+      case 'heal':
+        setPlayers(prevPlayers => 
+          prevPlayers.map(player => {
+            if (player.id === playerId) {
+              return {
+                ...player,
+                health: Math.min(100, player.health + 20)
+              };
+            }
+            return player;
+          })
+        );
+        break;
+      case 'shield':
+        setActivePowerUps(prev => ({
+          ...prev,
+          [playerId]: [...(prev[playerId] || []), {
+            type: powerUp,
+            endsAt: Date.now() + (powerUp.duration * 1000)
+          }]
+        }));
+        break;
+      case 'criticalHit':
+        setActivePowerUps(prev => ({
+          ...prev,
+          [playerId]: [...(prev[playerId] || []), {
+            type: powerUp,
+            endsAt: Date.now() + (powerUp.duration * 1000)
+          }]
+        }));
+        break;
+      case 'stun':
+        // Find opponent and stun them
+        const opponentId = getOpponent(playerId)?.id;
+        if (opponentId) {
+          setStunned(prev => ({
+            ...prev,
+            [opponentId]: Date.now() + (powerUp.duration * 1000)
+          }));
+        }
+        break;
+      default:
+        break;
+    }
+    
+    // Remove the power-up from available list
+    setAvailablePowerUps(prev => {
+      const newPowerUps = {...prev};
+      delete newPowerUps[playerId];
+      return newPowerUps;
+    });
+  };
+
+  // Calculate damage based on active power-ups
+  const calculateDamage = (playerId) => {
+    if (!activePowerUps[playerId]) return 1;
+    
+    let damage = 1;
+    const now = Date.now();
+    
+    // Check for active power-ups and apply effects
+    const activePowerUpsList = activePowerUps[playerId].filter(pu => pu.endsAt > now);
+    
+    activePowerUpsList.forEach(powerUp => {
+      if (powerUp.type.id === 'doubleDamage') {
+        damage *= 2;
+      } else if (powerUp.type.id === 'criticalHit') {
+        damage *= 5;
+        // Remove critical hit after use
+        setActivePowerUps(prev => ({
+          ...prev,
+          [playerId]: prev[playerId].filter(pu => pu !== powerUp)
+        }));
+      }
+    });
+    
+    return damage;
+  };
+
+  // Calculate damage reduction based on active shields
+  const calculateDamageReduction = (playerId) => {
+    if (!activePowerUps[playerId]) return 1; // No reduction
+    
+    let damageMultiplier = 1;
+    const now = Date.now();
+    
+    // Check for active shields
+    const activeShields = activePowerUps[playerId].filter(
+      pu => pu.endsAt > now && pu.type.id === 'shield'
+    );
+    
+    if (activeShields.length > 0) {
+      damageMultiplier = 0.5; // 50% damage reduction with shield
+    }
+    
+    return damageMultiplier;
+  };
+
+  // Check and clean up expired power-ups
+  useEffect(() => {
+    if (!gameActive) return;
+    
+    const checkPowerUps = setInterval(() => {
+      const now = Date.now();
+      
+      // Clean up expired power-ups
+      setActivePowerUps(prev => {
+        const newPowerUps = {};
+        Object.keys(prev).forEach(playerId => {
+          const activePowerUpsList = prev[playerId].filter(pu => pu.endsAt > now);
+          if (activePowerUpsList.length > 0) {
+            newPowerUps[playerId] = activePowerUpsList;
+          }
+        });
+        return newPowerUps;
+      });
+      
+      // Clean up expired stuns
+      setStunned(prev => {
+        const newStunned = {};
+        Object.keys(prev).forEach(playerId => {
+          if (prev[playerId] > now) {
+            newStunned[playerId] = prev[playerId];
+          }
+        });
+        return newStunned;
+      });
+    }, 500);
+    
+    return () => clearInterval(checkPowerUps);
+  }, [gameActive]);
+
   // Handle player clicks
   const handleClick = (playerId) => {
     if (!gameActive || gameEnded) return;
+    
+    // Check if player is stunned
+    if (stunned[playerId] && stunned[playerId] > Date.now()) {
+      return; // Player is stunned, cannot attack
+    }
     
     setPlayers(prevPlayers => {
       const updatedPlayers = [...prevPlayers];
@@ -83,22 +342,36 @@ function DrinkingGame() {
       const opponentIndex = updatedPlayers.findIndex(p => p.id === opponentId);
       const opponent = updatedPlayers[opponentIndex];
       
+      // Calculate damage based on power-ups
+      const baseDamage = calculateDamage(playerId);
+      
+      // Apply damage reduction if opponent has a shield
+      const damageMultiplier = calculateDamageReduction(opponentId);
+      const finalDamage = Math.max(1, Math.floor(baseDamage * damageMultiplier));
+      
       // Update clicks and reduce opponent health
       player.clicks += 1;
-      opponent.health = Math.max(0, opponent.health - 1);
+      opponent.health = Math.max(0, opponent.health - finalDamage);
       
-      // Check for winner
+      // Check for winner of this match
       if (opponent.health <= 0 && !gameEnded) {
         setGameEnded(true);
         setGameActive(false);
-        setWinner(player.id);
+        
+        if (currentRound === 1) {
+          // Add winner to list for second round
+          setRoundWinners(prev => [...prev, playerId]);
+        } else if (currentRound === 2) {
+          // Final winner
+          setWinner(playerId);
+        }
       }
       
       return updatedPlayers;
     });
   };
 
-  // Reset the game
+  // Reset the game completely
   const resetGame = () => {
     setPlayers(initialPlayers.map(player => ({
       ...player,
@@ -108,6 +381,13 @@ function DrinkingGame() {
     setGameActive(false);
     setGameEnded(false);
     setWinner(null);
+    setCurrentRound(0);
+    setRoundWinners([]);
+    setPairings([]);
+    setActivePowerUps({});
+    setAvailablePowerUps({});
+    if (powerUpTimer) clearInterval(powerUpTimer);
+    setStunned({});
   };
 
   // Get opponent for a player
@@ -119,40 +399,58 @@ function DrinkingGame() {
     return players.find(p => p.id === opponentId);
   };
 
-  // Check if player is in semifinals or finals
+  // Check if player is in active match
   const isPlayerActive = (playerId) => {
     if (!pairings.length) return false;
     return pairings.some(pair => pair.includes(playerId));
   };
 
-  // When game ends, find the winners and set up the final match
+  // Check if first round is complete
   useEffect(() => {
-    if (gameEnded && pairings.length === 2 && !winner) {
-      // First round ended, set up final match
-      const winners = pairings.map(pair => {
-        const player1 = players.find(p => p.id === pair[0]);
-        const player2 = players.find(p => p.id === pair[1]);
-        return player1.health <= 0 ? player2.id : player1.id;
-      });
-      
-      // Reset for the final match
-      setPairings([winners]);
-      setPlayers(prevPlayers => 
-        prevPlayers.map(player => ({
-          ...player,
-          health: 100,
-          clicks: 0
-        }))
-      );
-      setGameEnded(false);
+    if (currentRound === 1 && gameEnded && roundWinners.length === 1) {
+      // Check if the other match is still ongoing
+      const otherPairing = pairings.find(pair => !pair.includes(roundWinners[0]));
+      if (otherPairing) {
+        const player1 = players.find(p => p.id === otherPairing[0]);
+        const player2 = players.find(p => p.id === otherPairing[1]);
+        
+        if (player1.health <= 0) {
+          setRoundWinners(prev => [...prev, player2.id]);
+        } else if (player2.health <= 0) {
+          setRoundWinners(prev => [...prev, player1.id]);
+        }
+      }
     }
-  }, [gameEnded, pairings, players, winner]);
+  }, [currentRound, gameEnded, roundWinners, pairings, players]);
+
+  // When both first round matches are complete, prepare for second round
+  useEffect(() => {
+    if (currentRound === 1 && roundWinners.length === 2 && gameEnded) {
+      // Set timeout to allow users to see the results before starting next round
+      setTimeout(() => {
+        setGameActive(false);
+        setGameEnded(false);
+      }, 2000);
+    }
+  }, [currentRound, roundWinners, gameEnded]);
+
+  // Get player's active power-ups for display
+  const getPlayerActivePowerUps = (playerId) => {
+    if (!activePowerUps[playerId]) return [];
+    const now = Date.now();
+    return activePowerUps[playerId].filter(pu => pu.endsAt > now);
+  };
+
+  // Check if player is stunned
+  const isPlayerStunned = (playerId) => {
+    return stunned[playerId] && stunned[playerId] > Date.now();
+  };
 
   return (
     <div style={styles.container}>
-      <h1 style={styles.title}>Mad Gorilla Boxing 🦍👊</h1>
+      <h1 style={styles.title}>Mad Gorilla Boxing Tournament 🦍👊</h1>
       
-      {!gameActive && !gameEnded && countdown === 3 && (
+      {currentRound === 0 && (
         <div style={styles.setupSection}>
           <div style={styles.playersContainer}>
             {players.map(player => (
@@ -176,7 +474,7 @@ function DrinkingGame() {
             style={styles.startButton} 
             onClick={startGame}
           >
-            Start Boxing Match!
+            Start Tournament!
           </button>
         </div>
       )}
@@ -191,6 +489,10 @@ function DrinkingGame() {
         <div style={styles.boxingRing}>
           <div style={styles.ringRopes}></div>
           
+          <div style={styles.roundBanner}>
+            {currentRound === 1 ? "SEMI-FINALS" : "CHAMPIONSHIP FINAL"}
+          </div>
+          
           <div style={styles.playersContainer}>
             {players.map(player => (
               isPlayerActive(player.id) && (
@@ -198,12 +500,16 @@ function DrinkingGame() {
                   key={player.id}
                   style={{
                     ...styles.boxerCard,
-                    ...(winner === player.id ? styles.winnerCard : {})
+                    ...(winner === player.id ? styles.winnerCard : {}),
+                    ...(isPlayerStunned(player.id) ? styles.stunnedCard : {})
                   }}
                 >
                   <div style={styles.boxerTop}>
                     <div style={styles.emoji}>{player.emoji}</div>
                     <div style={styles.boxerName}>{playerNames[player.id]}</div>
+                    {isPlayerStunned(player.id) && (
+                      <div style={styles.stunnedBadge}>STUNNED! 💫</div>
+                    )}
                   </div>
                   
                   <div style={styles.healthBarContainer}>
@@ -220,17 +526,52 @@ function DrinkingGame() {
                     Punches: {player.clicks}
                   </div>
                   
+                  {/* Active Power-ups Display */}
+                  {getPlayerActivePowerUps(player.id).length > 0 && (
+                    <div style={styles.activePowerUps}>
+                      {getPlayerActivePowerUps(player.id).map((powerUp, index) => (
+                        <div key={index} style={styles.activePowerUp}>
+                          {powerUp.type.emoji} {powerUp.type.name}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  
+                  {/* Available Power-up */}
+                  {availablePowerUps[player.id] && (
+                    <div style={styles.availablePowerUp}>
+                      <div style={styles.powerUpInfo}>
+                        {availablePowerUps[player.id].emoji} {availablePowerUps[player.id].name}
+                        <div style={styles.powerUpEffect}>{availablePowerUps[player.id].effect}</div>
+                      </div>
+                      <button 
+                        style={styles.powerUpButton}
+                        onClick={() => usePowerUp(player.id)}
+                      >
+                        Use Power-up!
+                      </button>
+                    </div>
+                  )}
+                  
                   {gameActive && (
                     <button 
-                      style={styles.punchButton}
+                      style={{
+                        ...styles.punchButton,
+                        ...(isPlayerStunned(player.id) ? styles.disabledButton : {})
+                      }}
                       onClick={() => handleClick(player.id)}
+                      disabled={isPlayerStunned(player.id)}
                     >
-                      PUNCH! 👊
+                      {isPlayerStunned(player.id) ? "STUNNED!" : "PUNCH! 👊"}
                     </button>
                   )}
                   
-                  {winner === player.id && (
-                    <div style={styles.winnerBadge}>WINNER! 🏆</div>
+                  {(currentRound === 1 && roundWinners.includes(player.id)) && (
+                    <div style={styles.winnerBadge}>ADVANCES TO FINAL! 🏆</div>
+                  )}
+                  
+                  {(currentRound === 2 && winner === player.id) && (
+                    <div style={styles.championBadge}>CHAMPION! 👑</div>
                   )}
                   
                   {getOpponent(player.id) && (
@@ -246,16 +587,33 @@ function DrinkingGame() {
             ))}
           </div>
           
-          {gameEnded && winner && (
+          {currentRound === 1 && roundWinners.length === 2 && !gameActive && (
             <div style={styles.gameResult}>
               <h2 style={styles.resultText}>
-                {playerNames[winner]} wins the boxing match!
+                Semi-Finals Complete!
+              </h2>
+              <p style={styles.finalistsText}>
+                {playerNames[roundWinners[0]]} and {playerNames[roundWinners[1]]} advance to the final!
+              </p>
+              <button 
+                style={styles.advanceButton}
+                onClick={startSecondRound}
+              >
+                Start Championship Final!
+              </button>
+            </div>
+          )}
+          
+          {currentRound === 2 && winner && (
+            <div style={styles.gameResult}>
+              <h2 style={styles.resultText}>
+                {playerNames[winner]} is the Tournament Champion!
               </h2>
               <button 
                 style={styles.resetButton}
                 onClick={resetGame}
               >
-                New Match
+                New Tournament
               </button>
             </div>
           )}
@@ -266,10 +624,10 @@ function DrinkingGame() {
         <p>How to play:</p>
         <ol>
           <li>Name your gorillas</li>
-          <li>Click "Start Boxing Match"</li>
-          <li>When countdown ends, click the PUNCH button as fast as you can</li>
-          <li>Deplete your opponent's health to win</li>
-          <li>Winners advance to the championship!</li>
+          <li>Click "Start Tournament" for 2v2 semi-finals</li>
+          <li>Click the PUNCH button as fast as you can</li>
+          <li>Collect and use power-ups to gain advantages</li>
+          <li>Winners from each semi-final advance to the championship!</li>
         </ol>
       </div>
     </div>
@@ -330,6 +688,20 @@ const styles = {
     pointerEvents: 'none',
     zIndex: 1
   },
+  roundBanner: {
+    position: 'absolute',
+    top: '10px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    backgroundColor: '#FFD700',
+    color: '#333',
+    padding: '5px 20px',
+    borderRadius: '15px',
+    fontWeight: 'bold',
+    fontSize: '18px',
+    zIndex: 3,
+    boxShadow: '0 3px 5px rgba(0,0,0,0.3)'
+  },
   boxerCard: {
     width: '200px',
     padding: '20px',
@@ -344,11 +716,16 @@ const styles = {
     backgroundColor: 'rgba(255, 215, 0, 0.2)',
     boxShadow: '0 5px 20px rgba(255, 215, 0, 0.5)'
   },
+  stunnedCard: {
+    backgroundColor: 'rgba(200, 200, 200, 0.8)',
+    boxShadow: '0 5px 15px rgba(0,0,0,0.2)'
+  },
   boxerTop: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    marginBottom: '10px'
+    marginBottom: '10px',
+    position: 'relative'
   },
   boxerName: {
     fontWeight: 'bold',
@@ -386,6 +763,45 @@ const styles = {
     fontSize: '14px',
     marginBottom: '10px'
   },
+  activePowerUps: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '5px',
+    marginBottom: '10px'
+  },
+  activePowerUp: {
+    padding: '5px',
+    fontSize: '12px',
+    backgroundColor: '#e8f5e9',
+    borderRadius: '5px',
+    fontWeight: 'bold'
+  },
+  availablePowerUp: {
+    backgroundColor: '#e3f2fd',
+    padding: '10px',
+    borderRadius: '5px',
+    marginBottom: '10px',
+    border: '2px dashed #2196F3'
+  },
+  powerUpInfo: {
+    marginBottom: '5px',
+    fontWeight: 'bold'
+  },
+  powerUpEffect: {
+    fontSize: '12px',
+    color: '#555',
+    marginTop: '3px'
+  },
+  powerUpButton: {
+    padding: '8px 12px',
+    backgroundColor: '#2196F3',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: 'bold'
+  },
   punchButton: {
     width: '100%',
     padding: '15px',
@@ -400,6 +816,10 @@ const styles = {
     boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
     transition: 'all 0.1s ease'
   },
+  disabledButton: {
+    backgroundColor: '#9e9e9e',
+    cursor: 'not-allowed'
+  },
   winnerBadge: {
     position: 'absolute',
     top: '-15px',
@@ -411,6 +831,27 @@ const styles = {
     fontWeight: 'bold',
     boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
     zIndex: 3
+  },
+  championBadge: {
+    position: 'absolute',
+    top: '-15px',
+    right: '-15px',
+    backgroundColor: '#FFD700',
+    color: '#333',
+    padding: '5px 10px',
+    borderRadius: '20px',
+    fontWeight: 'bold',
+    boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
+    zIndex: 3
+  },
+  stunnedBadge: {
+    padding: '5px 10px',
+    backgroundColor: '#9e9e9e',
+    color: '#fff',
+    borderRadius: '10px',
+    fontSize: '12px',
+    fontWeight: 'bold',
+    marginTop: '5px'
   },
   vsContainer: {
     marginTop: '15px',
@@ -459,6 +900,18 @@ const styles = {
     marginTop: '20px',
     boxShadow: '0 3px 5px rgba(0,0,0,0.2)'
   },
+  advanceButton: {
+    padding: '12px 25px',
+    fontSize: '16px',
+    backgroundColor: '#FF9800',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    marginTop: '20px',
+    boxShadow: '0 3px 5px rgba(0,0,0,0.2)',
+    fontWeight: 'bold'
+  },
   gameResult: {
     marginTop: '30px',
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
@@ -469,6 +922,10 @@ const styles = {
   resultText: {
     color: '#333',
     marginBottom: '10px'
+  },
+  finalistsText: {
+    fontSize: '16px',
+    color: '#444'
   },
   countdownContainer: {
     margin: '30px 0',
