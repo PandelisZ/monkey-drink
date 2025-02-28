@@ -4,12 +4,12 @@ import PowerUpButton from './components/PowerUpButton';
 import BoxingRing from './components/BoxingRing';
 
 function DrinkingGame() {
-  // Player data with health and clicks
+  // Player data with health and clicks - fixed names as required
   const initialPlayers = [
-    { id: 1, name: "Player 1", emoji: "🦍", health: 100, clicks: 0 },
-    { id: 2, name: "Player 2", emoji: "🦍", health: 100, clicks: 0 },
-    { id: 3, name: "Player 3", emoji: "🦍", health: 100, clicks: 0 },
-    { id: 4, name: "Player 4", emoji: "🦍", health: 100, clicks: 0 }
+    { id: 1, name: "Tom", emoji: "🦍", health: 100, clicks: 0 },
+    { id: 2, name: "Ben", emoji: "🦍", health: 100, clicks: 0 },
+    { id: 3, name: "Sam", emoji: "🦍", health: 100, clicks: 0 },
+    { id: 4, name: "Ben", emoji: "🦍", health: 100, clicks: 0 }
   ];
 
   // Power-ups definitions
@@ -23,12 +23,6 @@ function DrinkingGame() {
 
   // State variables
   const [players, setPlayers] = useState(initialPlayers);
-  const [playerNames, setPlayerNames] = useState({
-    1: "Player 1",
-    2: "Player 2",
-    3: "Player 3",
-    4: "Player 4"
-  });
   const [gameActive, setGameActive] = useState(false);
   const [gameEnded, setGameEnded] = useState(false);
   const [winner, setWinner] = useState(null);
@@ -40,24 +34,15 @@ function DrinkingGame() {
   const [availablePowerUps, setAvailablePowerUps] = useState({}); // { playerId: powerUpType }
   const [powerUpTimer, setPowerUpTimer] = useState(null);
   const [stunned, setStunned] = useState({});
-  const [powerUpToUse, setPowerUpToUse] = useState(null); // New state to track which power-up to use
-
-  // Handle name change
-  const handleNameChange = (id, newName) => {
-    setPlayerNames(prevNames => ({
-      ...prevNames,
-      [id]: newName
-    }));
-  };
+  const [powerUpToUse, setPowerUpToUse] = useState(null); // Track which power-up to use
 
   // Start the boxing match
   const startGame = () => {
-    // Reset player stats
+    // Reset player stats but keep fixed names
     setPlayers(initialPlayers.map(player => ({
       ...player,
       health: 100,
-      clicks: 0,
-      name: playerNames[player.id]
+      clicks: 0
     })));
     
     // Create random pairings for first round
@@ -105,7 +90,7 @@ function DrinkingGame() {
       }))
     );
     
-    // Set up final round pairing
+    // Set up final round pairing - ensure only one pairing (2 gorillas)
     setPairings([roundWinners]);
     
     // Reset game state for new round
@@ -141,7 +126,7 @@ function DrinkingGame() {
         return;
       }
       
-      // Get active players from current pairings
+      // Get only active players from current pairings
       const activePlayers = pairings.flat();
       
       // Randomly decide if a power-up should appear (30% chance)
@@ -456,13 +441,7 @@ function DrinkingGame() {
                 style={styles.playerCard}
               >
                 <div style={styles.emoji}>{player.emoji}</div>
-                <input
-                  type="text"
-                  value={playerNames[player.id]}
-                  onChange={(e) => handleNameChange(player.id, e.target.value)}
-                  style={styles.nameInput}
-                  placeholder="Enter gorilla name"
-                />
+                <div style={styles.playerName}>{player.name}</div>
               </div>
             ))}
           </div>
@@ -485,7 +464,10 @@ function DrinkingGame() {
       {(gameActive || gameEnded) && (
         <BoxingRing
           players={players}
-          playerNames={playerNames}
+          playerNames={players.reduce((acc, player) => {
+            acc[player.id] = player.name;
+            return acc;
+          }, {})}
           gameActive={gameActive}
           gameEnded={gameEnded}
           currentRound={currentRound}
@@ -506,7 +488,7 @@ function DrinkingGame() {
       <div style={styles.instructions}>
         <p>How to play:</p>
         <ol>
-          <li>Name your gorillas</li>
+          <li>Meet your gorillas: Tom, Ben, Sam, and Ben</li>
           <li>Click "Start Tournament" for 2v2 semi-finals</li>
           <li>Click the PUNCH button as fast as you can</li>
           <li>Collect and use power-ups to gain advantages</li>
@@ -618,6 +600,11 @@ const styles = {
   emoji: {
     fontSize: '60px',
     marginBottom: '10px'
+  },
+  playerName: {
+    fontWeight: 'bold',
+    fontSize: '18px',
+    margin: '10px 0'
   },
   healthBarContainer: {
     width: '100%',
@@ -751,15 +738,6 @@ const styles = {
   opponentInfo: {
     fontStyle: 'italic',
     fontSize: '14px'
-  },
-  nameInput: {
-    width: '90%',
-    padding: '8px',
-    margin: '5px 0',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px',
-    textAlign: 'center'
   },
   startButton: {
     padding: '15px 30px',

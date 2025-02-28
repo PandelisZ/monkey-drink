@@ -53,7 +53,7 @@ function BoxingRing({
             <PlayerCard
               key={player.id}
               player={player}
-              playerName={playerNames[player.id]}
+              playerName={player.name}
               isActive={isPlayerActive(player.id)}
               isStunned={isPlayerStunned(player.id)}
               isWinner={winner === player.id}
@@ -62,7 +62,7 @@ function BoxingRing({
               gameActive={gameActive}
               availablePowerUp={availablePowerUps[player.id]}
               activePowerUps={activePowerUps[player.id] || []}
-              opponentInfo={getOpponent(player.id) ? playerNames[getOpponent(player.id).id] : null}
+              opponentInfo={getOpponent(player.id) ? getOpponent(player.id).name : null}
               onPunchClick={handleClick}
               onUsePowerUp={setPowerUpToUse}
               currentRound={currentRound}
@@ -78,7 +78,7 @@ function BoxingRing({
             Semi-Finals Complete!
           </h2>
           <p style={styles.finalistsText}>
-            {playerNames[roundWinners[0]]} and {playerNames[roundWinners[1]]} advance to the final!
+            {players.find(p => p.id === roundWinners[0]).name} and {players.find(p => p.id === roundWinners[1]).name} advance to the final!
           </p>
           <button 
             style={styles.advanceButton}
@@ -92,7 +92,7 @@ function BoxingRing({
       {currentRound === 2 && winner && (
         <div style={styles.gameResult}>
           <h2 style={styles.resultText}>
-            {playerNames[winner]} is the Tournament Champion!
+            {players.find(p => p.id === winner).name} is the Tournament Champion!
           </h2>
           <button 
             style={styles.resetButton}
