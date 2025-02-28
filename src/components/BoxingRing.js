@@ -96,6 +96,41 @@ function BoxingRing({
                          roundWinners.length === 2 && 
                          !localGameActive;
 
+  // Improved power-up button styles
+  const powerUpButtonStyle = {
+    display: 'inline-block',
+    margin: '4px',
+    padding: '5px',
+    backgroundColor: '#e3f2fd',
+    border: '1px solid #90caf9',
+    borderRadius: '4px',
+    textAlign: 'center',
+    cursor: 'pointer',
+    fontSize: '10px',
+    width: '60px',
+    height: '60px',
+    overflow: 'hidden',
+    boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
+    verticalAlign: 'top'
+  };
+
+  // Style for power-ups container
+  const powerUpsContainerStyle = {
+    marginTop: '10px',
+    padding: '5px',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    borderRadius: '4px',
+    textAlign: 'center',
+    maxWidth: '250px'
+  };
+
+  // Style for power-up title
+  const powerUpsTitleStyle = {
+    fontSize: '14px',
+    margin: '0 0 5px 0',
+    color: '#333'
+  };
+
   return (
     <div style={styles.boxingRing}>
       <div style={styles.ringRopes}></div>
@@ -110,7 +145,7 @@ function BoxingRing({
       <div style={styles.playersContainer}>
         {playersWithReducedHealth.map(player => (
           isPlayerActive(player.id) && (
-            <div key={player.id} style={styles.playerColumn}>
+            <div key={player.id} style={{...styles.playerColumn, maxWidth: '250px'}}>
               <PlayerCard
                 player={player}
                 playerName={player.name}
@@ -129,27 +164,22 @@ function BoxingRing({
                 styles={styles}
               />
               
-              {/* Power-up section */}
+              {/* Simplified power-up section */}
               {localGameActive && !gameEnded && (
-                <div style={styles.powerUpsSection}>
-                  <h3 style={styles.powerUpsTitle}>Power-Ups</h3>
-                  <div style={styles.powerUpsGrid}>
-                    {powerUpsData.map((powerUp, index) => (
-                      // Randomly show power-ups with 40% probability
-                      Math.random() < 0.4 && (
-                        <button
-                          key={index}
-                          style={styles.powerUpButton}
-                          onClick={() => handlePowerUpClick(player.id, powerUp.id)}
-                          disabled={!localGameActive || gameEnded}
-                        >
-                          <div>{powerUp.emoji}</div>
-                          <div>{powerUp.name}</div>
-                          <small>{powerUp.effect}</small>
-                        </button>
-                      )
-                    ))}
-                  </div>
+                <div style={powerUpsContainerStyle}>
+                  <h4 style={powerUpsTitleStyle}>Power-Ups</h4>
+                  {/* Limit to 3 power-ups max to prevent overflow */}
+                  {powerUpsData.slice(0, 3).map((powerUp, index) => (
+                    <button
+                      key={index}
+                      style={powerUpButtonStyle}
+                      onClick={() => handlePowerUpClick(player.id, powerUp.id)}
+                      disabled={!localGameActive || gameEnded}
+                    >
+                      <div style={{fontSize: '16px'}}>{powerUp.emoji}</div>
+                      <div style={{fontSize: '9px', fontWeight: 'bold', margin: '2px 0'}}>{powerUp.name}</div>
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
