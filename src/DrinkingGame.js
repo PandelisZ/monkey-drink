@@ -1,15 +1,32 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  getRandomPowerUp, 
+  createPowerUpInterval, 
+  isPowerUpActive, 
+  applyPowerUpEffects, 
+  getRandomPosition 
+} from './PowerUp';
 
 function DrinkingGame() {
-  // Player data with health and clicks
+  // References
+  const boxingRingRef = useRef(null);
+  
+  // Game state
+  const [round, setRound] = useState(1);
+  const [gameStage, setGameStage] = useState('setup'); // 'setup', 'countdown', 'playing', 'roundEnd', 'gameEnd'
+  const [countdown, setCountdown] = useState(3);
+  const [winner, setWinner] = useState(null);
+  const [finalists, setFinalists] = useState([]);
+  const [roundWinners, setRoundWinners] = useState([]);
+  
+  // Player data
   const initialPlayers = [
-    { id: 1, name: "Player 1", emoji: "🦍", health: 100, clicks: 0 },
-    { id: 2, name: "Player 2", emoji: "🦍", health: 100, clicks: 0 },
-    { id: 3, name: "Player 3", emoji: "🦍", health: 100, clicks: 0 },
-    { id: 4, name: "Player 4", emoji: "🦍", health: 100, clicks: 0 }
+    { id: 1, emoji: "🦍", health: 100, clicks: 0 },
+    { id: 2, emoji: "🦍", health: 100, clicks: 0 },
+    { id: 3, emoji: "🦍", health: 100, clicks: 0 },
+    { id: 4, emoji: "🦍", health: 100, clicks: 0 }
   ];
-
-  // State variables
+  
   const [players, setPlayers] = useState(initialPlayers);
   const [playerNames, setPlayerNames] = useState({
     1: "Player 1",
@@ -17,12 +34,15 @@ function DrinkingGame() {
     3: "Player 3",
     4: "Player 4"
   });
-  const [gameActive, setGameActive] = useState(false);
-  const [gameEnded, setGameEnded] = useState(false);
-  const [winner, setWinner] = useState(null);
-  const [countdown, setCountdown] = useState(3);
   const [pairings, setPairings] = useState([]);
-
+  
+  // Power-up state
+  const [activePowerUps, setActivePowerUps] = useState([]);
+  const [playerPowerUps, setPlayerPowerUps] = useState({
+    1: [], 2: [], 3: [], 4: []
+  });
+  const [powerUpInterval, setPowerUpInterval] = useState(null);
+  
   // Handle name change
   const handleNameChange = (id, newName) => {
     setPlayerNames(prevNames => ({
@@ -30,45 +50,179 @@ function DrinkingGame() {
       [id]: newName
     }));
   };
-
-  // Start the boxing match
+  
+  // Start the game
   const startGame = () => {
-    // Reset player stats
+    // Reset player states
     setPlayers(initialPlayers.map(player => ({
       ...player,
       health: 100,
-      clicks: 0,
-      name: playerNames[player.id]
+      clicks: 0
     })));
     
-    // Create random pairings
-    const shuffledPlayers = [...initialPlayers].sort(() => Math.random() - 0.5);
+    // Reset game state
+    setRound(1);
+    setWinner(null);
+    setRoundWinners([]);
+    setFinalists([]);
+    setPlayerPowerUps({
+      1: [], 2: [], 3: [], 4: []
+    });
+    
+    // Create random pairings for round 1
+    const shuffledPlayerIds = [1, 2, 3, 4].sort(() => Math.random() - 0.5);
     const newPairings = [
-      [shuffledPlayers[0].id, shuffledPlayers[1].id],
-      [shuffledPlayers[2].id, shuffledPlayers[3].id]
+      [shuffledPlayerIds[0], shuffledPlayerIds[1]],
+      [shuffledPlayerIds[2], shuffledPlayerIds[3]]
     ];
     setPairings(newPairings);
     
     // Start countdown
-    setGameEnded(false);
-    setWinner(null);
+    setGameStage('countdown');
     setCountdown(3);
     
+    // Start countdown timer
     const timer = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
           clearInterval(timer);
-          setGameActive(true);
+          setGameStage('playing');
+          startPowerUpGeneration();
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
   };
-
+  
+  // Start round 2 (final)
+  const startRound2 = () => {
+    // Reset players for round 2
+    setPlayers(prevPlayers => 
+      prevPlayers.map(player => ({
+        ...player,
+        health: 100,
+        clicks: 0
+      }))
+    );
+    
+    // Clear all power-ups
+    setActivePowerUps([]);
+    setPlayerPowerUps({
+      1: [], 2: [], 3: [], 4: []
+    });
+    
+    // Set up final match
+    setPairings([[roundWinners[0], roundWinners[1]]]);
+    setRound(2);
+    
+    // Start countdown
+    setGameStage('countdown');
+    setCountdown(3);
+    
+    // Start countdown timer
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          setGameStage('playing');
+          startPowerUpGeneration();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+  
+  // Generate power-ups
+  const startPowerUpGeneration = () => {
+    // Clear any existing interval
+    if (powerUpInterval) {
+      clearInterval(powerUpInterval);
+    }
+    
+    // Start a new interval for power-up generation
+    const interval = createPowerUpInterval((powerUp) => {
+      if (gameStage === 'playing' && boxingRingRef.current) {
+        // Get random position within boxing ring
+        const ringRect = boxingRingRef.current.getBoundingClientRect();
+        const position = getRandomPosition(ringRect.width, ringRect.height, 60, 60);
+        
+        // Add the new power-up to the active list
+        setActivePowerUps(prev => [
+          ...prev, 
+          { 
+            ...powerUp, 
+            position, 
+            collected: false,
+            id: `${powerUp.id}-${Date.now()}`
+          }
+        ]);
+        
+        // Remove the power-up after 5 seconds if not collected
+        setTimeout(() => {
+          setActivePowerUps(prev => 
+            prev.filter(p => p.id !== `${powerUp.id}-${Date.now()}`)
+          );
+        }, 5000);
+      }
+    });
+    
+    setPowerUpInterval(interval);
+  };
+  
+  // Collect a power-up
+  const collectPowerUp = (powerUpId, playerId) => {
+    setActivePowerUps(prev => {
+      const updatedPowerUps = prev.map(p => 
+        p.id === powerUpId ? { ...p, collected: true } : p
+      );
+      
+      // Find the collected power-up
+      const collectedPowerUp = prev.find(p => p.id === powerUpId);
+      
+      // Apply the power-up to the player
+      if (collectedPowerUp) {
+        setPlayerPowerUps(prevPlayerPowerUps => {
+          const updatedPlayerPowerUps = { ...prevPlayerPowerUps };
+          
+          // Add the power-up to the player's list
+          updatedPlayerPowerUps[playerId] = [
+            ...updatedPlayerPowerUps[playerId],
+            { 
+              ...collectedPowerUp,
+              startTime: Date.now(),
+              endTime: Date.now() + collectedPowerUp.duration
+            }
+          ];
+          
+          // Apply instant effects if any
+          if (collectedPowerUp.instantEffect) {
+            setPlayers(prevPlayers => {
+              return prevPlayers.map(player => {
+                if (player.id === playerId) {
+                  return {
+                    ...player,
+                    health: collectedPowerUp.instantEffect(player.health)
+                  };
+                }
+                return player;
+              });
+            });
+          }
+          
+          return updatedPlayerPowerUps;
+        });
+      }
+      
+      // Remove the collected power-up from display
+      return updatedPowerUps.filter(p => p.id !== powerUpId);
+    });
+  };
+  
   // Handle player clicks
   const handleClick = (playerId) => {
-    if (!gameActive || gameEnded) return;
+    if (gameStage !== 'playing') return;
     
     setPlayers(prevPlayers => {
       const updatedPlayers = [...prevPlayers];
@@ -78,81 +232,193 @@ function DrinkingGame() {
       const player = updatedPlayers[playerIndex];
       
       // Find opponent based on pairings
-      const pairingWithPlayer = pairings.find(pair => pair.includes(playerId));
-      const opponentId = pairingWithPlayer.find(id => id !== playerId);
+      const currentPairing = pairings.find(pair => pair.includes(playerId));
+      if (!currentPairing) return updatedPlayers;
+      
+      const opponentId = currentPairing.find(id => id !== playerId);
       const opponentIndex = updatedPlayers.findIndex(p => p.id === opponentId);
       const opponent = updatedPlayers[opponentIndex];
       
-      // Update clicks and reduce opponent health
-      player.clicks += 1;
-      opponent.health = Math.max(0, opponent.health - 1);
+      // Check if player is frozen by opponent's power-up
+      const playerPowerUpsArray = playerPowerUps[playerId] || [];
+      const opponentPowerUpsArray = playerPowerUps[opponentId] || [];
       
-      // Check for winner
-      if (opponent.health <= 0 && !gameEnded) {
-        setGameEnded(true);
-        setGameActive(false);
-        setWinner(player.id);
+      const isPlayerFrozen = opponentPowerUpsArray.some(
+        powerUp => isPowerUpActive(powerUp) && powerUp.freezeOpponent
+      );
+      
+      if (isPlayerFrozen) {
+        // Player is frozen and cannot punch
+        return updatedPlayers;
+      }
+      
+      // Calculate base damage
+      let baseDamage = 1;
+      
+      // Apply rapid fire multiplier if active
+      const hasRapidFire = playerPowerUpsArray.some(
+        powerUp => isPowerUpActive(powerUp) && powerUp.clickMultiplier
+      );
+      
+      // Determine number of clicks to register
+      let clicksToAdd = 1;
+      if (hasRapidFire) {
+        const rapidFirePowerUp = playerPowerUpsArray.find(
+          powerUp => isPowerUpActive(powerUp) && powerUp.clickMultiplier
+        );
+        clicksToAdd = rapidFirePowerUp ? rapidFirePowerUp.clickMultiplier : 1;
+      }
+      
+      // Update player clicks
+      player.clicks += clicksToAdd;
+      
+      // Apply power-up effects to damage
+      const totalDamage = applyPowerUpEffects(
+        baseDamage * clicksToAdd, 
+        playerPowerUpsArray, 
+        opponentPowerUpsArray
+      );
+      
+      // Reduce opponent health
+      opponent.health = Math.max(0, opponent.health - totalDamage);
+      
+      // Check for round winner
+      if (opponent.health <= 0) {
+        // Stop power-up generation
+        if (powerUpInterval) {
+          clearInterval(powerUpInterval);
+          setPowerUpInterval(null);
+        }
+        
+        if (round === 1) {
+          // Store winner for round 1
+          setRoundWinners(prev => [...prev, playerId]);
+          
+          // Check if both matches of round 1 are completed
+          if (roundWinners.length === 1 || prev.length === 1) {
+            setGameStage('roundEnd');
+          }
+        } else {
+          // Final round winner
+          setWinner(playerId);
+          setGameStage('gameEnd');
+        }
       }
       
       return updatedPlayers;
     });
   };
-
-  // Reset the game
+  
+  // Reset the entire game
   const resetGame = () => {
-    setPlayers(initialPlayers.map(player => ({
-      ...player,
-      health: 100,
-      clicks: 0
-    })));
-    setGameActive(false);
-    setGameEnded(false);
+    // Clear power-up generation
+    if (powerUpInterval) {
+      clearInterval(powerUpInterval);
+      setPowerUpInterval(null);
+    }
+    
+    // Reset all states
+    setPlayers(initialPlayers);
+    setActivePowerUps([]);
+    setPlayerPowerUps({
+      1: [], 2: [], 3: [], 4: []
+    });
+    setRound(1);
     setWinner(null);
+    setRoundWinners([]);
+    setFinalists([]);
+    setGameStage('setup');
   };
-
+  
+  // Clean up power-ups on component unmount
+  useEffect(() => {
+    return () => {
+      if (powerUpInterval) {
+        clearInterval(powerUpInterval);
+      }
+    };
+  }, [powerUpInterval]);
+  
+  // Process when round 1 ends
+  useEffect(() => {
+    if (roundWinners.length === 2 && gameStage === 'roundEnd') {
+      // Prepare for round 2
+      setFinalists(roundWinners);
+    }
+  }, [roundWinners, gameStage]);
+  
   // Get opponent for a player
   const getOpponent = (playerId) => {
-    if (!pairings.length) return null;
-    const pairingWithPlayer = pairings.find(pair => pair.includes(playerId));
-    if (!pairingWithPlayer) return null;
-    const opponentId = pairingWithPlayer.find(id => id !== playerId);
+    const currentPairing = pairings.find(pair => pair.includes(playerId));
+    if (!currentPairing) return null;
+    
+    const opponentId = currentPairing.find(id => id !== playerId);
     return players.find(p => p.id === opponentId);
   };
-
-  // Check if player is in semifinals or finals
+  
+  // Check if player is active in current round
   const isPlayerActive = (playerId) => {
     if (!pairings.length) return false;
     return pairings.some(pair => pair.includes(playerId));
   };
-
-  // When game ends, find the winners and set up the final match
-  useEffect(() => {
-    if (gameEnded && pairings.length === 2 && !winner) {
-      // First round ended, set up final match
-      const winners = pairings.map(pair => {
-        const player1 = players.find(p => p.id === pair[0]);
-        const player2 = players.find(p => p.id === pair[1]);
-        return player1.health <= 0 ? player2.id : player1.id;
-      });
-      
-      // Reset for the final match
-      setPairings([winners]);
-      setPlayers(prevPlayers => 
-        prevPlayers.map(player => ({
-          ...player,
-          health: 100,
-          clicks: 0
-        }))
-      );
-      setGameEnded(false);
-    }
-  }, [gameEnded, pairings, players, winner]);
+  
+  // Render active power-ups in the ring
+  const renderActivePowerUps = () => {
+    return activePowerUps.map(powerUp => (
+      <div 
+        key={powerUp.id}
+        style={{
+          ...styles.powerUpItem,
+          left: `${powerUp.position.left}px`,
+          top: `${powerUp.position.top}px`,
+          backgroundColor: powerUp.color
+        }}
+        onClick={() => {
+          // When clicked, assign to nearest player
+          const activePlayers = pairings.flat();
+          if (activePlayers.length > 0) {
+            // For simplicity, randomly assign to one of the active players
+            const randomPlayerIndex = Math.floor(Math.random() * activePlayers.length);
+            collectPowerUp(powerUp.id, activePlayers[randomPlayerIndex]);
+          }
+        }}
+      >
+        <div style={styles.powerUpIcon}>{powerUp.icon}</div>
+      </div>
+    ));
+  };
+  
+  // Render power-ups for a player
+  const renderPlayerPowerUps = (playerId) => {
+    const playerActivePowerUps = playerPowerUps[playerId] || [];
+    const activePowerUpsList = playerActivePowerUps.filter(isPowerUpActive);
+    
+    if (activePowerUpsList.length === 0) return null;
+    
+    return (
+      <div style={styles.playerPowerUps}>
+        {activePowerUpsList.map((powerUp, index) => (
+          <div 
+            key={`${playerId}-${powerUp.id}-${index}`}
+            style={{
+              ...styles.playerPowerUpItem,
+              backgroundColor: powerUp.color
+            }}
+            title={powerUp.description}
+          >
+            <span>{powerUp.icon}</span>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div style={styles.container}>
       <h1 style={styles.title}>Mad Gorilla Boxing 🦍👊</h1>
       
-      {!gameActive && !gameEnded && countdown === 3 && (
+      {/* Setup screen */}
+      {gameStage === 'setup' && (
         <div style={styles.setupSection}>
           <div style={styles.playersContainer}>
             {players.map(player => (
@@ -176,21 +442,45 @@ function DrinkingGame() {
             style={styles.startButton} 
             onClick={startGame}
           >
-            Start Boxing Match!
+            Start 2v2 Boxing Tournament
           </button>
+          
+          <div style={styles.instructions}>
+            <p>How to play:</p>
+            <ol>
+              <li>Name your gorillas</li>
+              <li>Two 2v2 matches will be played (Round 1)</li>
+              <li>Winners face off in the championship (Round 2)</li>
+              <li>Click rapidly to punch your opponent</li>
+              <li>Collect power-ups that appear in the ring!</li>
+              <li>First to deplete opponent's health wins</li>
+            </ol>
+          </div>
         </div>
       )}
       
-      {countdown > 0 && countdown < 3 && (
+      {/* Countdown screen */}
+      {gameStage === 'countdown' && (
         <div style={styles.countdownContainer}>
-          <h2 style={styles.countdown}>Get Ready: {countdown}</h2>
+          <h2 style={styles.roundTitle}>Round {round}</h2>
+          <h2 style={styles.countdown}>{countdown}</h2>
         </div>
       )}
       
-      {(gameActive || gameEnded) && (
-        <div style={styles.boxingRing}>
+      {/* Active gameplay */}
+      {(gameStage === 'playing' || gameStage === 'roundEnd' || gameStage === 'gameEnd') && (
+        <div style={styles.boxingRing} ref={boxingRingRef}>
           <div style={styles.ringRopes}></div>
           
+          {/* Round indicator */}
+          <div style={styles.roundIndicator}>
+            Round {round}: {round === 1 ? 'Semi-Finals' : 'Championship'}
+          </div>
+          
+          {/* Power-ups in the ring */}
+          {gameStage === 'playing' && renderActivePowerUps()}
+          
+          {/* Players */}
           <div style={styles.playersContainer}>
             {players.map(player => (
               isPlayerActive(player.id) && (
@@ -204,6 +494,9 @@ function DrinkingGame() {
                   <div style={styles.boxerTop}>
                     <div style={styles.emoji}>{player.emoji}</div>
                     <div style={styles.boxerName}>{playerNames[player.id]}</div>
+                    
+                    {/* Player's active power-ups */}
+                    {renderPlayerPowerUps(player.id)}
                   </div>
                   
                   <div style={styles.healthBarContainer}>
@@ -220,7 +513,7 @@ function DrinkingGame() {
                     Punches: {player.clicks}
                   </div>
                   
-                  {gameActive && (
+                  {gameStage === 'playing' && (
                     <button 
                       style={styles.punchButton}
                       onClick={() => handleClick(player.id)}
@@ -229,7 +522,8 @@ function DrinkingGame() {
                     </button>
                   )}
                   
-                  {winner === player.id && (
+                  {(((gameStage === 'roundEnd' && roundWinners.includes(player.id)) || 
+                     (gameStage === 'gameEnd' && winner === player.id))) && (
                     <div style={styles.winnerBadge}>WINNER! 🏆</div>
                   )}
                   
@@ -246,32 +540,43 @@ function DrinkingGame() {
             ))}
           </div>
           
-          {gameEnded && winner && (
+          {/* Round 1 completion screen */}
+          {gameStage === 'roundEnd' && roundWinners.length === 2 && (
             <div style={styles.gameResult}>
               <h2 style={styles.resultText}>
-                {playerNames[winner]} wins the boxing match!
+                Semi-Finals Complete!
               </h2>
+              <p>
+                {playerNames[roundWinners[0]]} and {playerNames[roundWinners[1]]} advance to the championship!
+              </p>
+              <button 
+                style={styles.continueButton}
+                onClick={startRound2}
+              >
+                Start Championship Round
+              </button>
+            </div>
+          )}
+          
+          {/* Game end screen */}
+          {gameStage === 'gameEnd' && winner && (
+            <div style={styles.gameResult}>
+              <h2 style={styles.resultText}>
+                🏆 Tournament Champion 🏆
+              </h2>
+              <p style={styles.championText}>
+                {playerNames[winner]} is the Mad Gorilla Boxing Champion!
+              </p>
               <button 
                 style={styles.resetButton}
                 onClick={resetGame}
               >
-                New Match
+                New Tournament
               </button>
             </div>
           )}
         </div>
       )}
-      
-      <div style={styles.instructions}>
-        <p>How to play:</p>
-        <ol>
-          <li>Name your gorillas</li>
-          <li>Click "Start Boxing Match"</li>
-          <li>When countdown ends, click the PUNCH button as fast as you can</li>
-          <li>Deplete your opponent's health to win</li>
-          <li>Winners advance to the championship!</li>
-        </ol>
-      </div>
     </div>
   );
 }
@@ -317,7 +622,8 @@ const styles = {
     marginBottom: '30px',
     border: '15px solid #A0522D',
     boxShadow: 'inset 0 0 20px rgba(0,0,0,0.5), 0 10px 20px rgba(0,0,0,0.3)',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    minHeight: '500px'
   },
   ringRopes: {
     position: 'absolute',
@@ -329,6 +635,18 @@ const styles = {
     borderBottom: '6px solid #FFD700',
     pointerEvents: 'none',
     zIndex: 1
+  },
+  roundIndicator: {
+    position: 'absolute',
+    top: '10px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    color: '#fff',
+    padding: '5px 15px',
+    borderRadius: '20px',
+    fontWeight: 'bold',
+    zIndex: 5
   },
   boxerCard: {
     width: '200px',
@@ -348,7 +666,8 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    marginBottom: '10px'
+    marginBottom: '10px',
+    position: 'relative'
   },
   boxerName: {
     fontWeight: 'bold',
@@ -448,10 +767,21 @@ const styles = {
     transition: 'background-color 0.3s ease',
     boxShadow: '0 3px 5px rgba(0,0,0,0.2)'
   },
-  resetButton: {
-    padding: '10px 20px',
+  continueButton: {
+    padding: '12px 25px',
     fontSize: '16px',
     backgroundColor: '#2196F3',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    marginTop: '20px',
+    boxShadow: '0 3px 5px rgba(0,0,0,0.2)'
+  },
+  resetButton: {
+    padding: '12px 25px',
+    fontSize: '16px',
+    backgroundColor: '#4CAF50',
     color: 'white',
     border: 'none',
     borderRadius: '5px',
@@ -464,11 +794,18 @@ const styles = {
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     padding: '20px',
     borderRadius: '8px',
-    boxShadow: '0 5px 15px rgba(0,0,0,0.2)'
+    boxShadow: '0 5px 15px rgba(0,0,0,0.2)',
+    zIndex: 5,
+    position: 'relative'
   },
   resultText: {
     color: '#333',
     marginBottom: '10px'
+  },
+  championText: {
+    fontSize: '20px',
+    fontWeight: 'bold',
+    margin: '15px 0'
   },
   countdownContainer: {
     margin: '30px 0',
@@ -476,9 +813,13 @@ const styles = {
     padding: '30px',
     borderRadius: '8px'
   },
+  roundTitle: {
+    color: '#FFD700',
+    marginBottom: '15px'
+  },
   countdown: {
     color: '#fff',
-    fontSize: '36px'
+    fontSize: '60px'
   },
   instructions: {
     marginTop: '40px',
@@ -487,6 +828,38 @@ const styles = {
     padding: '20px',
     borderRadius: '8px',
     boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+  },
+  powerUpItem: {
+    position: 'absolute',
+    width: '50px',
+    height: '50px',
+    borderRadius: '50%',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    cursor: 'pointer',
+    zIndex: 10,
+    animation: 'pulse 1.5s infinite ease-in-out',
+    boxShadow: '0 0 15px rgba(255,255,255,0.7)',
+    transition: 'transform 0.2s ease'
+  },
+  powerUpIcon: {
+    fontSize: '24px'
+  },
+  playerPowerUps: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: '5px',
+    gap: '5px'
+  },
+  playerPowerUpItem: {
+    width: '24px',
+    height: '24px',
+    borderRadius: '50%',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    fontSize: '14px'
   }
 };
 
