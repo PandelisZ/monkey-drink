@@ -28,9 +28,16 @@ function BoxingRing({
     return players.find(p => p.id === opponentId);
   };
 
-  // Check if player is in active match
+  // Check if player is in active match - modified to ensure only two gorillas at a time
   const isPlayerActive = (playerId) => {
     if (!pairings.length) return false;
+    
+    // In first round, only show one pairing at a time (first one)
+    if (currentRound === 1) {
+      return pairings[0].includes(playerId);
+    }
+    
+    // In final round, show the only remaining pairing
     return pairings.some(pair => pair.includes(playerId));
   };
 
@@ -52,7 +59,7 @@ function BoxingRing({
           isPlayerActive(player.id) && (
             <PlayerCard
               key={player.id}
-              player={player}
+              player={{...player, health: 50}} // Reduce health to 50
               playerName={player.name}
               isActive={isPlayerActive(player.id)}
               isStunned={isPlayerStunned(player.id)}
@@ -71,6 +78,28 @@ function BoxingRing({
           )
         ))}
       </div>
+      
+      {currentRound === 1 && roundWinners.length === 1 && !gameActive && pairings.length > 1 && (
+        <div style={styles.gameResult}>
+          <h2 style={styles.resultText}>
+            First Semi-Final Complete!
+          </h2>
+          <p style={styles.finalistsText}>
+            {players.find(p => p.id === roundWinners[0]).name} advances to the final!
+          </p>
+          <button 
+            style={styles.advanceButton}
+            onClick={() => {
+              // Move to the second pairing
+              const newPairings = [...pairings];
+              newPairings.shift(); // Remove the first pairing
+              // This will trigger re-render showing only the second pairing
+            }}
+          >
+            Continue to Second Semi-Final
+          </button>
+        </div>
+      )}
       
       {currentRound === 1 && roundWinners.length === 2 && !gameActive && (
         <div style={styles.gameResult}>
