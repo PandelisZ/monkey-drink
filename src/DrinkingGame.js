@@ -79,7 +79,7 @@ function DrinkingGame() {
     setAnswerResult(null);
     setPlayerAnswer('');
     
-    // Simulate spinning effect but always land on player 3
+    // Simulate spinning effect
     let counter = 0;
     const interval = setInterval(() => {
       // During animation, show different players for visual effect
@@ -88,8 +88,9 @@ function DrinkingGame() {
       
       if (counter >= 10) {
         clearInterval(interval);
-        // Always select player 3 at the end
-        setSelectedPlayer(3);
+        // Randomly select any player
+        const randomPlayer = Math.floor(Math.random() * 4) + 1;
+        setSelectedPlayer(randomPlayer);
         setSpinning(false);
         
         // Select a random question
