@@ -1,4 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import PlayerCard from './components/PlayerCard';
+import PowerUpButton from './components/PowerUpButton';
+import BoxingRing from './components/BoxingRing';
 
 function DrinkingGame() {
   // Player data with health and clicks
@@ -411,12 +414,6 @@ function DrinkingGame() {
     return players.find(p => p.id === opponentId);
   };
 
-  // Check if player is in active match
-  const isPlayerActive = (playerId) => {
-    if (!pairings.length) return false;
-    return pairings.some(pair => pair.includes(playerId));
-  };
-
   // Check if first round is complete
   useEffect(() => {
     if (currentRound === 1 && gameEnded && roundWinners.length === 1) {
@@ -445,18 +442,6 @@ function DrinkingGame() {
       }, 2000);
     }
   }, [currentRound, roundWinners, gameEnded]);
-
-  // Get player's active power-ups for display
-  const getPlayerActivePowerUps = (playerId) => {
-    if (!activePowerUps[playerId]) return [];
-    const now = Date.now();
-    return activePowerUps[playerId].filter(pu => pu.endsAt > now);
-  };
-
-  // Check if player is stunned
-  const isPlayerStunned = (playerId) => {
-    return stunned[playerId] && stunned[playerId] > Date.now();
-  };
 
   return (
     <div style={styles.container}>
@@ -498,138 +483,24 @@ function DrinkingGame() {
       )}
       
       {(gameActive || gameEnded) && (
-        <div style={styles.boxingRing}>
-          <div style={styles.ringRopes}></div>
-          
-          <div style={styles.roundBanner}>
-            {currentRound === 1 ? "SEMI-FINALS" : "CHAMPIONSHIP FINAL"}
-          </div>
-          
-          <div style={styles.playersContainer}>
-            {players.map(player => (
-              isPlayerActive(player.id) && (
-                <div 
-                  key={player.id}
-                  style={{
-                    ...styles.boxerCard,
-                    ...(winner === player.id ? styles.winnerCard : {}),
-                    ...(isPlayerStunned(player.id) ? styles.stunnedCard : {})
-                  }}
-                >
-                  <div style={styles.boxerTop}>
-                    <div style={styles.emoji}>{player.emoji}</div>
-                    <div style={styles.boxerName}>{playerNames[player.id]}</div>
-                    {isPlayerStunned(player.id) && (
-                      <div style={styles.stunnedBadge}>STUNNED! 💫</div>
-                    )}
-                  </div>
-                  
-                  <div style={styles.healthBarContainer}>
-                    <div style={{
-                      ...styles.healthBar,
-                      width: `${player.health}%`,
-                      backgroundColor: player.health > 50 ? '#4CAF50' : 
-                                      player.health > 25 ? '#FFC107' : '#FF5722'
-                    }}></div>
-                    <span style={styles.healthText}>{player.health}%</span>
-                  </div>
-                  
-                  <div style={styles.clicksCounter}>
-                    Punches: {player.clicks}
-                  </div>
-                  
-                  {/* Active Power-ups Display */}
-                  {getPlayerActivePowerUps(player.id).length > 0 && (
-                    <div style={styles.activePowerUps}>
-                      {getPlayerActivePowerUps(player.id).map((powerUp, index) => (
-                        <div key={index} style={styles.activePowerUp}>
-                          {powerUp.type.emoji} {powerUp.type.name}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  
-                  {/* Available Power-up */}
-                  {availablePowerUps[player.id] && (
-                    <div style={styles.availablePowerUp}>
-                      <div style={styles.powerUpInfo}>
-                        {availablePowerUps[player.id].emoji} {availablePowerUps[player.id].name}
-                        <div style={styles.powerUpEffect}>{availablePowerUps[player.id].effect}</div>
-                      </div>
-                      <button 
-                        style={styles.powerUpButton}
-                        onClick={() => setPowerUpToUse(player.id)}
-                      >
-                        Use Power-up!
-                      </button>
-                    </div>
-                  )}
-                  
-                  {gameActive && (
-                    <button 
-                      style={{
-                        ...styles.punchButton,
-                        ...(isPlayerStunned(player.id) ? styles.disabledButton : {})
-                      }}
-                      onClick={() => handleClick(player.id)}
-                      disabled={isPlayerStunned(player.id)}
-                    >
-                      {isPlayerStunned(player.id) ? "STUNNED!" : "PUNCH! 👊"}
-                    </button>
-                  )}
-                  
-                  {(currentRound === 1 && roundWinners.includes(player.id)) && (
-                    <div style={styles.winnerBadge}>ADVANCES TO FINAL! 🏆</div>
-                  )}
-                  
-                  {(currentRound === 2 && winner === player.id) && (
-                    <div style={styles.championBadge}>CHAMPION! 👑</div>
-                  )}
-                  
-                  {getOpponent(player.id) && (
-                    <div style={styles.vsContainer}>
-                      <span style={styles.vsText}>VS</span>
-                      <div style={styles.opponentInfo}>
-                        {playerNames[getOpponent(player.id).id]}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            ))}
-          </div>
-          
-          {currentRound === 1 && roundWinners.length === 2 && !gameActive && (
-            <div style={styles.gameResult}>
-              <h2 style={styles.resultText}>
-                Semi-Finals Complete!
-              </h2>
-              <p style={styles.finalistsText}>
-                {playerNames[roundWinners[0]]} and {playerNames[roundWinners[1]]} advance to the final!
-              </p>
-              <button 
-                style={styles.advanceButton}
-                onClick={startSecondRound}
-              >
-                Start Championship Final!
-              </button>
-            </div>
-          )}
-          
-          {currentRound === 2 && winner && (
-            <div style={styles.gameResult}>
-              <h2 style={styles.resultText}>
-                {playerNames[winner]} is the Tournament Champion!
-              </h2>
-              <button 
-                style={styles.resetButton}
-                onClick={resetGame}
-              >
-                New Tournament
-              </button>
-            </div>
-          )}
-        </div>
+        <BoxingRing
+          players={players}
+          playerNames={playerNames}
+          gameActive={gameActive}
+          gameEnded={gameEnded}
+          currentRound={currentRound}
+          winner={winner}
+          roundWinners={roundWinners}
+          pairings={pairings}
+          availablePowerUps={availablePowerUps}
+          activePowerUps={activePowerUps}
+          stunned={stunned}
+          handleClick={handleClick}
+          setPowerUpToUse={setPowerUpToUse}
+          startSecondRound={startSecondRound}
+          resetGame={resetGame}
+          styles={styles}
+        />
       )}
       
       <div style={styles.instructions}>
