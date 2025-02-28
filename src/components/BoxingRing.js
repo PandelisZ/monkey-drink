@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PlayerCard from './PlayerCard';
 
 function BoxingRing({ 
@@ -19,6 +19,9 @@ function BoxingRing({
   resetGame,
   styles
 }) {
+  // State to track which pairing is currently shown in the first round
+  const [activePairingIndex, setActivePairingIndex] = useState(0);
+
   // Helper function to get opponent for a player
   const getOpponent = (playerId) => {
     if (!pairings.length) return null;
@@ -32,9 +35,9 @@ function BoxingRing({
   const isPlayerActive = (playerId) => {
     if (!pairings.length) return false;
     
-    // In first round, only show one pairing at a time (first one)
-    if (currentRound === 1) {
-      return pairings[0].includes(playerId);
+    // In first round, only show the active pairing
+    if (currentRound === 1 && pairings.length > 1) {
+      return pairings[activePairingIndex].includes(playerId);
     }
     
     // In final round, show the only remaining pairing
@@ -46,20 +49,37 @@ function BoxingRing({
     return stunned[playerId] && stunned[playerId] > Date.now();
   };
 
+  // Handle moving to the second semi-final
+  const continueToSecondSemiFinal = () => {
+    setActivePairingIndex(1);
+    // Reset the game state for the second pairing
+    gameActive = true;
+    gameEnded = false;
+  };
+
+  // Initialize players with reduced health (50 instead of 100)
+  const playersWithReducedHealth = players.map(player => ({
+    ...player,
+    health: 50
+  }));
+
   return (
     <div style={styles.boxingRing}>
       <div style={styles.ringRopes}></div>
       
       <div style={styles.roundBanner}>
-        {currentRound === 1 ? "SEMI-FINALS" : "CHAMPIONSHIP FINAL"}
+        {currentRound === 1 ? 
+          `SEMI-FINALS (Match ${activePairingIndex + 1} of 2)` : 
+          "CHAMPIONSHIP FINAL"
+        }
       </div>
       
       <div style={styles.playersContainer}>
-        {players.map(player => (
+        {playersWithReducedHealth.map(player => (
           isPlayerActive(player.id) && (
             <PlayerCard
               key={player.id}
-              player={{...player, health: 50}} // Reduce health to 50
+              player={player} // Player already has reduced health
               playerName={player.name}
               isActive={isPlayerActive(player.id)}
               isStunned={isPlayerStunned(player.id)}
@@ -79,7 +99,7 @@ function BoxingRing({
         ))}
       </div>
       
-      {currentRound === 1 && roundWinners.length === 1 && !gameActive && pairings.length > 1 && (
+      {currentRound === 1 && roundWinners.length === 1 && !gameActive && pairings.length > 1 && activePairingIndex === 0 && (
         <div style={styles.gameResult}>
           <h2 style={styles.resultText}>
             First Semi-Final Complete!
@@ -89,12 +109,7 @@ function BoxingRing({
           </p>
           <button 
             style={styles.advanceButton}
-            onClick={() => {
-              // Move to the second pairing
-              const newPairings = [...pairings];
-              newPairings.shift(); // Remove the first pairing
-              // This will trigger re-render showing only the second pairing
-            }}
+            onClick={continueToSecondSemiFinal}
           >
             Continue to Second Semi-Final
           </button>
